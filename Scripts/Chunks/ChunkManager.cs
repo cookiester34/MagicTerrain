@@ -166,9 +166,10 @@ public class ChunkManager : MonoBehaviour
 		if (camera != null)
 		{
 			//frustum culling
+			var planes = GeometryUtility.CalculateFrustumPlanes(camera);
 			foreach (var activeContainer in activeContainers)
 			{
-				activeContainer.Value.SetVisible(IsRendererVisible(activeContainer.Value.MeshRenderer));
+				activeContainer.Value.SetVisible(IsRendererVisible(planes, activeContainer.Value.MeshRenderer));
 			}
 		}
 
@@ -228,11 +229,10 @@ public class ChunkManager : MonoBehaviour
 		activeContainers = visibleContainers;
 	}
 	
-	private bool IsRendererVisible(Renderer renderer) 
+	private bool IsRendererVisible(Plane[] planes, Renderer renderer) 
 	{
 		// Check if the renderer is within the view frustum of the camera
-		var bounds = renderer.bounds;
-		var visible = GeometryUtility.TestPlanesAABB(GeometryUtility.CalculateFrustumPlanes(camera), bounds);
+		var visible = GeometryUtility.TestPlanesAABB(planes, renderer.bounds);
 		return visible;
 	}
 
