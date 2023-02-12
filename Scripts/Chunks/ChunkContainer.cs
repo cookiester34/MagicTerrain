@@ -126,9 +126,9 @@ public class ChunkContainer : MonoBehaviour
 		meshRenderer.enabled = isVisible;
 	}
 
-	public void EditChunk(List<EditedChunkPointValue> points, bool add = false)
+	public void EditChunk(Vector3 point, float radius, bool add = false)
 	{
-		chunk.EditChunk(points, add);
+		chunk.EditChunk(point, radius, add);
 	}
 
 	public void UpdateChunkMesh(bool generateCollider)

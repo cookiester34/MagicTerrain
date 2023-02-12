@@ -1,7 +1,6 @@
 ﻿using Scripts;
 using Scripts.Chunks.Jobs;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Jobs;
@@ -36,6 +35,7 @@ public class Chunk
 	private CreateMeshDataJob createMeshJob;
 	private float[] localTerrainMap;
 
+	private NativeList<EditedChunkPointValue> points;
 	private NativeArray<float> terrainMap;
 	private NativeArray<Vector3> vertices;
 	private NativeArray<int> triangles;
@@ -72,7 +72,6 @@ public class Chunk
 
 	public async void ScheduleChunkJobs(Action chunkDone, bool generateCollider, bool calculateTerrainMap = true)
 	{
-		IsProccessing = true;
 		if (calculateTerrainMap)
 		{
 			var terrainMapHandle = CreateTerrainMap().Schedule(ChunkSize, 200);
@@ -103,7 +102,7 @@ public class Chunk
 		IsProccessing = false;
 	}
 
-	public PopulateTerrainMapJob CreateTerrainMap()
+	private PopulateTerrainMapJob CreateTerrainMap()
 	{
 		terrainMap = new NativeArray<float>(ChunkSize + ChunkSize * (ChunkSize + ChunkSize * ChunkSize),
 			Allocator.Persistent);
@@ -130,7 +129,7 @@ public class Chunk
 		return populateTerrainJob;
 	}
 
-	public CreateMeshDataJob MarchChunk()
+	private CreateMeshDataJob MarchChunk()
 	{
 		vertices = new NativeArray<Vector3>(900000, Allocator.Persistent);
 		triangles = new NativeArray<int>(900000, Allocator.Persistent);
@@ -192,59 +191,88 @@ public class Chunk
 		terrainMap.Dispose();
 	}
 
-	public void EditChunk(List<EditedChunkPointValue> points, bool add)
+	public async void EditChunk(Vector3 hitPoint, float radius, bool add)
 	{
 		var neighbourChunks = chunkManager.GetNeighbourChunks(ChunkPosition * scale);
 
 		if (neighbourChunks.Any(x => x.IsProccessing)) return;
 
-		var chunkTranslation = Matrix4x4.Translate(ChunkPosition);
-		var chunkScale = Matrix4x4.Scale(new Vector3(scale, scale, scale));
-		var chunkTransformation = chunkScale * chunkTranslation;
-		for (var index = 0; index < points.Count; index++)
-		{
-			var point = points[index];
-			Vector3 multiplyPoint = chunkTransformation.inverse.MultiplyPoint(point.PointPosition);
-			point.PointPosition = new Vector3Int((int) multiplyPoint.x, (int) multiplyPoint.y, (int) multiplyPoint.z);
-			points[index] = point;
-		}
+		IsProccessing = true;
+		var arraySize = ((Mathf.CeilToInt(radius) * 2 + 1) * 3) - 2;
+		points = new NativeList<EditedChunkPointValue>(arraySize, Allocator.Persistent);
+		var getCircleJobHandler = GetCirclePointJobs(hitPoint, radius, add).Schedule();
+		JobHandle.ScheduleBatchedJobs();
 
+		while (!getCircleJobHandler.IsCompleted)
+		{
+			await Task.Yield();
+		}
+		getCircleJobHandler.Complete();
+
+		var editedChunkPointValuesArray = new EditedChunkPointValue[points.Length];
+
+		for (var i = 0; i < points.Length; i++)
+		{
+			editedChunkPointValuesArray[i] = points[i];
+		}
+		
 		foreach (var neighbourChunk in neighbourChunks)
 		{
-			//Is this editing chunks it shouldn't be editing
 			var diferenceInPosition = ChunkPosition - neighbourChunk.ChunkPosition;
-			var wasEdited = false;
-			foreach (var point in points)
-			{
-				var relativePosition = point.PointPosition + diferenceInPosition;
-
-				if (relativePosition.x < 0 || relativePosition.y < 0 || relativePosition.z < 0
-				    || relativePosition.x >= ChunkSize || relativePosition.y >= ChunkSize|| relativePosition.z >= ChunkSize) continue;
-
-				var terrainMapIndex =
-					relativePosition.x + ChunkSize * (relativePosition.y + ChunkSize * relativePosition.z);
-
-				var isWithinBounds = terrainMapIndex >= 0 && terrainMapIndex < neighbourChunk.localTerrainMap.Length;
-
-				if (!isWithinBounds) continue;
-
-				if (add)
-				{
-					if (neighbourChunk.localTerrainMap[terrainMapIndex] <= point.PointValue)
-						continue;
-				}
-				else
-				{
-					if (neighbourChunk.localTerrainMap[terrainMapIndex] >= point.PointValue)
-						continue;
-				}
-				wasEdited = true;
-				neighbourChunk.localTerrainMap[terrainMapIndex] = point.PointValue;
-			}
-
-			if (!wasEdited) continue;
-			neighbourChunk.terrainMap = new NativeArray<float>(neighbourChunk.localTerrainMap, Allocator.Persistent);
-			neighbourChunk.ScheduleChunkJobs(null, true, false);
+			neighbourChunk.EditChunkJob(diferenceInPosition, editedChunkPointValuesArray, add);
 		}
+
+		points.Dispose();
+	}
+
+	private async void EditChunkJob(Vector3Int diferenceInPosition, EditedChunkPointValue[] editedChunkPointValues, bool add)
+	{
+		var chunkPointValues = new NativeArray<EditedChunkPointValue>(editedChunkPointValues, Allocator.Persistent);
+		terrainMap = new NativeArray<float>(localTerrainMap, Allocator.Persistent);
+		var wasEdited = new NativeArray<bool>(1, Allocator.Persistent);
+		var editTerrainMapJob = new EditTerrainMapJob()
+		{
+			diferenceInPosition = diferenceInPosition,
+			points = chunkPointValues,
+			add = add,
+			chunkSize = ChunkSize,
+			terrainMap = terrainMap,
+			wasEdited = wasEdited
+		};
+
+		var editTerrainMapHandler = editTerrainMapJob.Schedule(chunkPointValues.Length, 60);
+
+		while (!editTerrainMapHandler.IsCompleted)
+		{
+			await Task.Yield();
+		}
+		editTerrainMapHandler.Complete();
+
+		chunkPointValues.Dispose();
+
+		if (wasEdited[0])
+		{
+			ScheduleChunkJobs(null, true, false);
+		}
+		else
+		{
+			terrainMap.Dispose();
+			IsProccessing = false;
+		}
+		wasEdited.Dispose();
+	}
+
+	private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, float radius, bool add)
+	{
+		var getCirclePointsJob = new GetCirclePointsJob()
+		{
+			hitPosition = hitPoint,
+			add = add,
+			radius = radius,
+			points = points,
+			chunkPosition = ChunkPosition,
+			scale = scale
+		};
+		return getCirclePointsJob;
 	}
 }

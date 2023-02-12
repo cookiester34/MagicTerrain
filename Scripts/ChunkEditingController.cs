@@ -90,9 +90,7 @@ public class ChunkEditingController : MonoBehaviour
 		var chunkContainer = hit.transform.GetComponent<ChunkContainer>();
 		var hitInfoPoint = hit.point;
 		var hitPoint = new Vector3Int((int)hitInfoPoint.x, (int)hitInfoPoint.y, (int)hitInfoPoint.z);
-		chunkContainer.EditChunk(GetCirclePoints(hitPoint, add, radius), add);
-		
-		Debug.DrawRay(cameraTransform.position, cameraTransform.forward * hit.distance, Color.magenta);
+		chunkContainer.EditChunk(hitPoint, radius, add);
 	}
 
 	private List<EditedChunkPointValue> GetCirclePoints(Vector3 pos, bool add, float radius = 2f)
