@@ -44,12 +44,16 @@ public class Chunk
 	private NativeArray<float> cube;
 	private NativeArray<int> triangleCount;
 	private NativeArray<int> vertCount;
+	private Mesh[] meshes;
 
 	[SerializeField]
 	private Vector3Int chunkPosition;
 
 	[SerializeField]
-	private Mesh[] meshes;
+	private Vector3[] chunkVertices;
+
+	[SerializeField]
+	private int[] chunkTriangles;
 
 	//chunk queued info
 	public bool IsProccessing { get; set; }
@@ -168,25 +172,25 @@ public class Chunk
 	public void CreateChunk()
 	{
 		var tCount = triangleCount[0];
-		var newTriangles = new int[tCount];
+		chunkTriangles = new int[tCount];
 		for (var i = 0; i < tCount; i++)
 		{
-			newTriangles[i] = triangles[i];
+			chunkTriangles[i] = triangles[i];
 		}
 
 		var vCount = vertCount[0];
-		var newVertices = new Vector3[vCount];
+		chunkVertices = new Vector3[vCount];
 		for (var i = 0; i < vCount; i++)
 		{
-			newVertices[i] = vertices[i];
+			chunkVertices[i] = vertices[i];
 		}
 
 		Meshes = new[]
 		{
 			new Mesh
 			{
-				vertices = newVertices,
-				triangles = newTriangles
+				vertices = chunkVertices,
+				triangles = chunkTriangles
 			}
 		};
 		foreach (var mesh in Meshes)
