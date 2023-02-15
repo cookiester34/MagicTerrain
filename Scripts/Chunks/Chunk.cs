@@ -7,18 +7,20 @@ using Unity.Jobs;
 using System.Threading.Tasks;
 using UnityEngine;
 
+[Serializable]
 public class Chunk
 {
-	public Mesh[] Meshes { get; set; }
+	public Mesh[] Meshes { get => meshes; set => meshes = value; }
 	public int ChunkSize { get; }
 	public ChunkContainer CurrentChunkContainer { get; set; }
-	private Vector3Int ChunkPosition { get; }
+	private Vector3Int ChunkPosition => chunkPosition;
 
 	private readonly float terrainSurface = 0.5f;
 	private readonly int seed;
 	private readonly bool smooth;
 	private readonly bool flatShaded;
-	private readonly PlanetController planetController;
+	private readonly float planetSize;
+	private readonly Vector3 planetCenter;
 	private readonly int octaves;
 	private readonly float weightedStrength;
 	private readonly float lacunarity;
@@ -43,6 +45,12 @@ public class Chunk
 	private NativeArray<int> triangleCount;
 	private NativeArray<int> vertCount;
 
+	[SerializeField]
+	private Vector3Int chunkPosition;
+
+	[SerializeField]
+	private Mesh[] meshes;
+
 	//chunk queued info
 	public bool IsProccessing { get; set; }
 
@@ -53,10 +61,11 @@ public class Chunk
 		ChunkSize = chunkData.chunkSize;
 		ChunkSize++;
 		seed = chunkData.seed;
-		ChunkPosition = chunkData.chunkPosition / chunkData.scale;
+		chunkPosition = chunkData.chunkPosition / chunkData.scale;
 		this.smooth = smooth;
 		this.flatShaded = flatShaded;
-		planetController = chunkData.planetController;
+		planetSize = chunkData.planetSize;
+		planetCenter = chunkData.planetCenter;
 		octaves = chunkData.octaves;
 		weightedStrength = chunkData.weightedStrength;
 		lacunarity = chunkData.lacunarity;
@@ -70,7 +79,7 @@ public class Chunk
 		chunkManager = chunkData.chunkManager;
 	}
 
-	public async void ScheduleChunkJobs(Action chunkDone, bool generateCollider, bool calculateTerrainMap = true)
+	public async void ScheduleChunkJobs(Action chunkDone, bool generateCollider, bool calculateTerrainMap = true, bool CreateDataOnly = false)
 	{
 		if (calculateTerrainMap)
 		{
@@ -95,7 +104,11 @@ public class Chunk
 
 		marchChunkHandle.Complete();
 		CreateChunk();
-		CurrentChunkContainer.UpdateChunkMesh(generateCollider);
+
+		if (!CreateDataOnly)
+		{
+			CurrentChunkContainer.UpdateChunkMesh(generateCollider);
+		}
 
 		chunkDone?.Invoke();
 
@@ -121,11 +134,11 @@ public class Chunk
 			weightedStrengthCaves = weightedStrengthCaves,
 			lacunarityCaves = lacunarityCaves,
 			gainCaves = gainCaves,
-			isPlanet = planetController != null
+			isPlanet = planetSize != 0
 		};
-		if (planetController == null) return populateTerrainJob;
-		populateTerrainJob.planetCenter = planetController.planetCenter;
-		populateTerrainJob.planetSize = planetController.planetSize;
+		if (planetSize != 0) return populateTerrainJob;
+		populateTerrainJob.planetCenter = planetCenter;
+		populateTerrainJob.planetSize = planetSize;
 		return populateTerrainJob;
 	}
 
@@ -215,7 +228,7 @@ public class Chunk
 		{
 			editedChunkPointValuesArray[i] = points[i];
 		}
-		
+
 		foreach (var neighbourChunk in neighbourChunks)
 		{
 			var diferenceInPosition = ChunkPosition - neighbourChunk.ChunkPosition;

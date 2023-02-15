@@ -6,7 +6,8 @@ public struct ChunkData
 	public int chunkSize;
 	public Vector3Int chunkPosition;
 	public int scale;
-	public PlanetController planetController;
+	public float planetSize;
+	public Vector3 planetCenter;
 	public int octaves;
 	public float weightedStrength;
 	public float lacunarity;
