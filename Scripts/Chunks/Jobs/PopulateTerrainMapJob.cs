@@ -101,7 +101,6 @@ namespace Scripts.Chunks.Jobs
 						var t = 1f - Mathf.Exp(-0.3f * (distance - planetSize));
 						var value = Mathf.Lerp(caveNoiseValue > 0.47f ? caveNoiseValue : noiseValue, 1f, t);
 						terrainMap[index + chunkSize * (y + chunkSize * z)] = value;
-						continue;
 					}
 					else
 					{
@@ -117,11 +116,7 @@ namespace Scripts.Chunks.Jobs
 						var t = 1f - Mathf.Exp(-0.3f * (distance - 50f));
 						var value = Mathf.Lerp(surfaceNoise > 0.47f ? surfaceNoise : noiseValue, 1f, t);
 						terrainMap[index + chunkSize * (y + chunkSize * z)] = value;
-						continue;
 					}
-
-					// Set the value of this point in the terrainMap.
-					terrainMap[index + chunkSize * (y + chunkSize * z)] = noiseValue;
 				}
 			}
 		}

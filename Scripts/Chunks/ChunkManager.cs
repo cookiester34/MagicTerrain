@@ -86,8 +86,10 @@ public class ChunkManager : MonoBehaviour
 	private LayerMask layerMask;
 
 	public Dictionary<Vector3Int, Chunk> Chunks => chunks;
-	internal HashSet<Vector3Int> knownKeys = new();
+	public Dictionary<Chunk, bool> ChunksToEdit { get; } = new();
 
+	internal HashSet<Vector3Int> knownKeys = new();
+	
 	private PlanetController planetController;
 	private Dictionary<Vector3Int, Chunk> chunks = new();
 	private List<ChunkContainer> chunkContainers = new();
@@ -96,6 +98,7 @@ public class ChunkManager : MonoBehaviour
 	private bool forceUpdate = true;
 	private int chunkIncrement;
 	private Vector3 planetChunkManagerCenter;
+	private int frame;
 
 	//Flat[x + HEIGHT* (y + WIDTH* z)] = Original[x, y, z], assuming Original[HEIGHT,WIDTH,DEPTH]
 
@@ -161,6 +164,19 @@ public class ChunkManager : MonoBehaviour
 
 	private void Update()
 	{
+		frame++;
+		if (frame % 5 == 0)
+		{
+			frame = 0;
+			
+		}
+
+		var chunksToEdit = ChunksToEdit.Keys.ToArray();
+		foreach (var chunk in chunksToEdit)
+		{
+			chunk.CheckEditDone(ChunksToEdit[chunk]);
+		}
+		
 		chunkQueue.CheckIfValidQueueReady(player.position);
 		
 		if (camera != null)

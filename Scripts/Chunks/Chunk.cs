@@ -35,6 +35,7 @@ public class Chunk
 	private ChunkManager chunkManager;
 	private PopulateTerrainMapJob populateTerrainJob;
 	private CreateMeshDataJob createMeshJob;
+	private JobHandle getCircleJobHandler;
 	private float[] localTerrainMap;
 
 	private NativeList<EditedChunkPointValue> points;
@@ -140,7 +141,7 @@ public class Chunk
 			gainCaves = gainCaves,
 			isPlanet = planetSize != 0
 		};
-		if (planetSize != 0) return populateTerrainJob;
+		if (planetSize == 0) return populateTerrainJob;
 		populateTerrainJob.planetCenter = planetCenter;
 		populateTerrainJob.planetSize = planetSize;
 		return populateTerrainJob;
@@ -208,7 +209,7 @@ public class Chunk
 		terrainMap.Dispose();
 	}
 
-	public async void EditChunk(Vector3 hitPoint, float radius, bool add)
+	public void EditChunk(Vector3 hitPoint, float radius, bool add)
 	{
 		var neighbourChunks = chunkManager.GetNeighbourChunks(ChunkPosition * scale);
 
@@ -217,22 +218,31 @@ public class Chunk
 		IsProccessing = true;
 		var arraySize = ((Mathf.CeilToInt(radius) * 2 + 1) * 3) - 2;
 		points = new NativeList<EditedChunkPointValue>(arraySize, Allocator.Persistent);
-		var getCircleJobHandler = GetCirclePointJobs(hitPoint, radius, add).Schedule();
+		
+		getCircleJobHandler = GetCirclePointJobs(hitPoint, radius, add).Schedule();
 		JobHandle.ScheduleBatchedJobs();
 
-		while (!getCircleJobHandler.IsCompleted)
+		if (!chunkManager.ChunksToEdit.TryAdd(this, add))
 		{
-			await Task.Yield();
+			Debug.LogError("Failed to add chunk to edit queue");
 		}
+	}
+
+	public void CheckEditDone(bool add)
+	{
+		if (!getCircleJobHandler.IsCompleted) return;
+		
 		getCircleJobHandler.Complete();
 
-		var editedChunkPointValuesArray = new EditedChunkPointValue[points.Length];
+		var pointsLength = points.Length;
+		var editedChunkPointValuesArray = new EditedChunkPointValue[pointsLength];
 
-		for (var i = 0; i < points.Length; i++)
+		for (var i = 0; i < pointsLength; i++)
 		{
 			editedChunkPointValuesArray[i] = points[i];
 		}
 
+		var neighbourChunks = chunkManager.GetNeighbourChunks(ChunkPosition * scale);
 		foreach (var neighbourChunk in neighbourChunks)
 		{
 			var diferenceInPosition = ChunkPosition - neighbourChunk.ChunkPosition;
@@ -240,6 +250,8 @@ public class Chunk
 		}
 
 		points.Dispose();
+
+		chunkManager.ChunksToEdit.Remove(this);
 	}
 
 	private async void EditChunkJob(Vector3Int diferenceInPosition, EditedChunkPointValue[] editedChunkPointValues, bool add)

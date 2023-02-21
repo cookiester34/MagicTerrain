@@ -29,7 +29,8 @@ namespace Scripts.Chunks.Jobs
 		[BurstCompile]
 		public void Execute(int index)
 		{
-			var relativePosition = points[index].PointPosition + diferenceInPosition;
+			var editedChunkPointValue = points[index];
+			var relativePosition = editedChunkPointValue.PointPosition + diferenceInPosition;
 
 			if (relativePosition.x < 0 || relativePosition.y < 0 || relativePosition.z < 0
 			    || relativePosition.x >= chunkSize || relativePosition.y >= chunkSize ||
@@ -40,20 +41,21 @@ namespace Scripts.Chunks.Jobs
 			var isWithinBounds = terrainMapIndex >= 0 && terrainMapIndex < terrainMap.Length;
 
 			if (!isWithinBounds) return;
-				
+
+			var pointValue = editedChunkPointValue.PointValue;
 			if (add)
 			{
-				if (terrainMap[terrainMapIndex] <= points[index].PointValue)
+				if (terrainMap[terrainMapIndex] <= pointValue)
 					return;
 			}
 			else
 			{
-				if (terrainMap[terrainMapIndex] >= points[index].PointValue)
+				if (terrainMap[terrainMapIndex] >= pointValue)
 					return;
 			}
 
 			wasEdited[0] = true;
-			terrainMap[terrainMapIndex] = points[index].PointValue;
+			terrainMap[terrainMapIndex] = pointValue;
 		}
 	}
 }

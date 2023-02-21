@@ -56,6 +56,7 @@ namespace Scripts.Chunks
 
 		public void GeneratePlanet()
 		{
+			chunks.Clear();
 			var chunkIncrement = chunkSize * chunkScale;
 
 			for (var x = -planetSize;

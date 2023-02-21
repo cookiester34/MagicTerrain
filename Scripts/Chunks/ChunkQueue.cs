@@ -78,7 +78,7 @@ public class ChunkQueue
 				gainCaves = chunkManager.gainCaves,
 				chunkManager = chunkManager
 			},chunkManager.SmoothTerrain, chunkManager.FlatShaded);
-
+			
 			if (!chunkManager.Chunks.TryAdd(chunkContainerChunkPosition, chunk))
 			{
 				Debug.LogError($"Trying to create duplicate chunk at: {chunkContainerChunkPosition}");
