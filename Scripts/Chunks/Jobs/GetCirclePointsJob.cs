@@ -19,22 +19,25 @@ namespace Scripts.Chunks.Jobs
 		[ReadOnly]
 		public float radius;
 		
-		public NativeList<EditedChunkPointValue> points;
+		public NativeArray<EditedChunkPointValue> points;
+		
+		private int arrayIndex;
 			
 		[BurstCompile]
 		public void Execute()
 		{
+			arrayIndex = 0;
 			var posInt = new Vector3(hitPosition.x, hitPosition.y, hitPosition.z);
 			var chunkTranslation = Matrix4x4.Translate(chunkPosition);
 			var chunkScale = Matrix4x4.Scale(new Vector3(scale, scale, scale));
 			var chunkTransformation = chunkScale * chunkTranslation;
 			
-			var radiusCeil = Mathf.CeilToInt(radius);
-			for (var i = -radiusCeil; i <= radiusCeil; i++)
+			var radiusCeil = Mathf.CeilToInt(radius); // is 50
+			for (var i = -radiusCeil; i <= radiusCeil; i++) // from -50 to 50
 			{
-				for (var j = -radiusCeil; j <= radiusCeil; j++)
+				for (var j = -radiusCeil; j <= radiusCeil; j++)// from -50 to 50
 				{
-					for (var k = -radiusCeil; k <= radiusCeil; k++)
+					for (var k = -radiusCeil; k <= radiusCeil; k++)// from -50 to 50
 					{
 						var gridPoint = new Vector3(posInt.x + i,posInt.y + j,posInt.z + k);
 						var multiplyPoint = chunkTransformation.inverse.MultiplyPoint(
@@ -49,13 +52,14 @@ namespace Scripts.Chunks.Jobs
 						var lerpedValue = Mathf.Lerp(add ? 1 : 0, add ? 0 : 1, t);
 						if (Vector3.Distance(posInt, gridPoint) <= radius)
 						{
-							points.Add(new EditedChunkPointValue()
+							points[arrayIndex] = (new EditedChunkPointValue()
 							{
 								PointPosition = new Vector3Int((int)multiplyPoint.x,
 									(int)multiplyPoint.y,
 									(int)multiplyPoint.z),
 								PointValue = lerpedValue
 							});
+							arrayIndex++;
 						}
 					}
 				}

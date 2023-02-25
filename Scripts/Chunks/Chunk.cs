@@ -36,9 +36,10 @@ public class Chunk
 	private PopulateTerrainMapJob populateTerrainJob;
 	private CreateMeshDataJob createMeshJob;
 	private JobHandle getCircleJobHandler;
+	private JobHandle editTerrainMapHandler;
 	private float[] localTerrainMap;
 
-	private NativeList<EditedChunkPointValue> points;
+	private NativeArray<EditedChunkPointValue> points;
 	private NativeArray<float> terrainMap;
 	private NativeArray<Vector3> vertices;
 	private NativeArray<int> triangles;
@@ -46,6 +47,9 @@ public class Chunk
 	private NativeArray<int> triangleCount;
 	private NativeArray<int> vertCount;
 	private Mesh[] meshes;
+	
+	private NativeArray<EditedChunkPointValue> chunkPointValues;
+	private NativeArray<bool> wasEdited;
 
 	[SerializeField]
 	private Vector3Int chunkPosition;
@@ -216,49 +220,46 @@ public class Chunk
 		if (neighbourChunks.Any(x => x.IsProccessing)) return;
 
 		IsProccessing = true;
-		var arraySize = ((Mathf.CeilToInt(radius) * 2 + 1) * 3) - 2;
-		points = new NativeList<EditedChunkPointValue>(arraySize, Allocator.Persistent);
+		var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
+		var arraySize = ceilToInt * ceilToInt * ceilToInt;
+		points = new NativeArray<EditedChunkPointValue>(arraySize, Allocator.Persistent);
 		
 		getCircleJobHandler = GetCirclePointJobs(hitPoint, radius, add).Schedule();
-		JobHandle.ScheduleBatchedJobs();
 
-		if (!chunkManager.ChunksToEdit.TryAdd(this, add))
+		if (!chunkManager.ChunkPointsCalculating.TryAdd(this, add))
 		{
-			Debug.LogError("Failed to add chunk to edit queue");
+			Debug.LogError("Failed to add chunk to edit queue, cancelling edit");
+			points.Dispose();
+			return;
 		}
+		
+		JobHandle.ScheduleBatchedJobs();
 	}
 
-	public void CheckEditDone(bool add)
+	public async void CheckEditedPointsDone(bool add)
 	{
 		if (!getCircleJobHandler.IsCompleted) return;
 		
 		getCircleJobHandler.Complete();
 
-		var pointsLength = points.Length;
-		var editedChunkPointValuesArray = new EditedChunkPointValue[pointsLength];
-
-		for (var i = 0; i < pointsLength; i++)
-		{
-			editedChunkPointValuesArray[i] = points[i];
-		}
-
+			
 		var neighbourChunks = chunkManager.GetNeighbourChunks(ChunkPosition * scale);
 		foreach (var neighbourChunk in neighbourChunks)
 		{
 			var diferenceInPosition = ChunkPosition - neighbourChunk.ChunkPosition;
-			neighbourChunk.EditChunkJob(diferenceInPosition, editedChunkPointValuesArray, add);
+			neighbourChunk.EditChunkJob(diferenceInPosition, points, add);
 		}
 
 		points.Dispose();
 
-		chunkManager.ChunksToEdit.Remove(this);
+		chunkManager.ChunkPointsCalculating.Remove(this);
 	}
 
-	private async void EditChunkJob(Vector3Int diferenceInPosition, EditedChunkPointValue[] editedChunkPointValues, bool add)
+	private void EditChunkJob(Vector3Int diferenceInPosition, NativeArray<EditedChunkPointValue> editedChunkPointValues, bool add)
 	{
-		var chunkPointValues = new NativeArray<EditedChunkPointValue>(editedChunkPointValues, Allocator.Persistent);
+		chunkPointValues = new NativeArray<EditedChunkPointValue>(editedChunkPointValues, Allocator.Persistent);
 		terrainMap = new NativeArray<float>(localTerrainMap, Allocator.Persistent);
-		var wasEdited = new NativeArray<bool>(1, Allocator.Persistent);
+		wasEdited = new NativeArray<bool>(1, Allocator.Persistent);
 		var editTerrainMapJob = new EditTerrainMapJob()
 		{
 			diferenceInPosition = diferenceInPosition,
@@ -268,13 +269,16 @@ public class Chunk
 			terrainMap = terrainMap,
 			wasEdited = wasEdited
 		};
+		
+		editTerrainMapHandler = editTerrainMapJob.Schedule(chunkPointValues.Length, 60);
 
-		var editTerrainMapHandler = editTerrainMapJob.Schedule(chunkPointValues.Length, 60);
+		chunkManager.ChunksEditing.Add(this);
+	}
 
-		while (!editTerrainMapHandler.IsCompleted)
-		{
-			await Task.Yield();
-		}
+	public bool CheckIfEditDone()
+	{
+		if (!editTerrainMapHandler.IsCompleted) return false;
+		
 		editTerrainMapHandler.Complete();
 
 		chunkPointValues.Dispose();
@@ -289,6 +293,9 @@ public class Chunk
 			IsProccessing = false;
 		}
 		wasEdited.Dispose();
+
+		chunkManager.ChunksEditing.Remove(this);
+		return true;
 	}
 
 	private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, float radius, bool add)

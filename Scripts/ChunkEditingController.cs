@@ -8,17 +8,21 @@ public class ChunkEditingController : MonoBehaviour
 {
 	private Camera camera;
 	private PlayerInput playerInput;
-	private InputAction fireAction;
+	private InputAction fireActionRight;
+	private InputAction fireActionLeft;
+	private InputAction scrollWheelUp;
+	private InputAction scrollWheelDown;
 	private float editDelay = 0f;
 	private bool allowEdit;
 	private bool isRightMouseDown;
 	private bool isLeftMouseDown;
-
-	[SerializeField]
-	private float radius = 2f;
+	private float radius = 1f;
 
 	[SerializeField]
 	private float editSpeed = 5f;
+
+	[SerializeField]
+	private GameObject sphere;
 
 	private void Awake()
 	{
@@ -27,13 +31,19 @@ public class ChunkEditingController : MonoBehaviour
 
 		if (playerInput == null) return;
 
-		fireAction = playerInput.actions["LeftMouse"];
-		fireAction.performed += LeftMousePerformed;
-		fireAction.canceled += EditStopped;
+		fireActionLeft = playerInput.actions["LeftMouse"];
+		fireActionLeft.performed += LeftMousePerformed;
+		fireActionLeft.canceled += EditStopped;
 		
-		fireAction = playerInput.actions["RightMouse"];
-		fireAction.performed += RightMousePerformed;
-		fireAction.canceled += EditStopped;
+		fireActionRight = playerInput.actions["RightMouse"];
+		fireActionRight.performed += RightMousePerformed;
+		fireActionRight.canceled += EditStopped;
+
+		scrollWheelUp = playerInput.actions["ScrollUp"];
+		scrollWheelUp.performed += ScrollWheelPerformedUp;
+		
+		scrollWheelDown = playerInput.actions["ScrollDown"];
+		scrollWheelDown.performed += ScrollWheelPerformedDown;
 	}
 
 	private void Update()
@@ -53,6 +63,19 @@ public class ChunkEditingController : MonoBehaviour
 		{
 			LeftMousePerformed(default);
 		}
+		
+		var cameraTransform = camera.transform;
+		var ray = new Ray(cameraTransform.position, cameraTransform.forward);
+
+		if (Physics.SphereCast(ray, 0.5f, out var hit, 1000f))
+		{
+			sphere.SetActive(true);
+			sphere.transform.position = hit.point;
+		}
+		else
+		{
+			sphere.SetActive(false);
+		}
 	}
 
 	//TODO: Needs better logic, pressing both will break this
@@ -60,6 +83,18 @@ public class ChunkEditingController : MonoBehaviour
 	{
 		isRightMouseDown = false;
 		isLeftMouseDown = false;
+	}
+
+	private void ScrollWheelPerformedUp(InputAction.CallbackContext callbackContext)
+	{
+		sphere.transform.localScale += new Vector3(2, 2, 2);
+		radius += 1;
+	}
+	
+	private void ScrollWheelPerformedDown(InputAction.CallbackContext callbackContext)
+	{
+		sphere.transform.localScale -= new Vector3(2, 2, 2);
+		radius -= 1;
 	}
 
 	private void RightMousePerformed(InputAction.CallbackContext callbackContext)
