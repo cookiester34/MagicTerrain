@@ -65,7 +65,7 @@ public class ChunkQueue
 				chunkPosition = chunkContainerChunkPosition,
 				chunkSize = chunkManager.ChunkSize,
 				scale = chunkManager.ChunkScale,
-				planetCenter = planetController == null ? Vector3.zero : planetController.planetCenter,
+				planetCenter = planetController == null ? Vector3.zero : planetController.planetCenterRaw,
 				planetSize = planetController == null ? 0 : planetController.planetSize,
 				octaves = chunkManager.octaves,
 				lacunarity = chunkManager.lacunarity,

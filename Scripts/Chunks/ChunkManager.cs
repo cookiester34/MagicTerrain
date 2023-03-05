@@ -82,9 +82,6 @@ public class ChunkManager : MonoBehaviour
 	[SerializeField]
 	private Camera camera;
 
-	[SerializeField]
-	private LayerMask layerMask;
-
 	public Dictionary<Vector3Int, Chunk> Chunks => chunks;
 	public Dictionary<Chunk, bool> ChunkPointsCalculating { get; } = new();
 	public HashSet<Chunk> ChunksEditing { get; } = new();
@@ -156,14 +153,20 @@ public class ChunkManager : MonoBehaviour
 		chunkIncrement = chunkSize * chunkScale;
 		if (planetController != null)
 		{
-			planetController.planetCenter = (transform.position / chunkScale);
+			planetController.planetCenterRaw = transform.position;
 		}
-		var chunkOffset = chunkScale / 2;
-		planetChunkManagerCenter = transform.position - new Vector3(chunkSize * chunkOffset, chunkSize * chunkOffset, chunkSize * chunkOffset);
+		planetChunkManagerCenter = transform.position;
 	}
 
 	private void Update()
 	{
+		planetChunkManagerCenter = transform.position;
+		
+		if (planetController != null)
+		{
+			planetController.planetCenter = transform.position;
+		}
+		
 		var chunksPointCalculating = ChunkPointsCalculating.Keys.ToArray();
 		foreach (var chunk in chunksPointCalculating)
 		{
@@ -187,18 +190,25 @@ public class ChunkManager : MonoBehaviour
 				activeContainer.Value.SetVisible(IsRendererVisible(planes, activeContainer.Value.MeshRenderer));
 			}
 		}
+		else
+		{
+			foreach (var activeContainer in activeContainers)
+			{
+				activeContainer.Value.SetVisible(true);
+			}
+		}
 
 		var currentDistance = Vector3.Distance(player.position, playerLastPositionRelative);
 		if (!(currentDistance >= chunkUpdateDistance) && !forceUpdate) return;
 
 		forceUpdate = false;
-		playerLastPositionRelative = player.position - transform.position;
+		playerLastPositionRelative = (player.position) * chunkScale;
 
 		var playerPosition = new Vector3Int(
 			Mathf.RoundToInt(playerLastPositionRelative.x).RoundOff(chunkIncrement),
 			Mathf.RoundToInt(playerLastPositionRelative.y).RoundOff(chunkIncrement),
 			Mathf.RoundToInt(playerLastPositionRelative.z).RoundOff(chunkIncrement));
-
+		
 		Dictionary<Vector3Int, ChunkContainer> visibleContainers = new();
 
 		for (var x = playerPosition.x - horizontalViewDistance; x < playerPosition.x + horizontalViewDistance; x += chunkIncrement)

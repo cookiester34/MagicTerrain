@@ -6,5 +6,7 @@ public class PlanetController : MonoBehaviour
 	[SerializeField]
 	internal float planetSize;
 
+	internal Vector3 planetCenterRaw;
+	
 	internal Vector3 planetCenter;
 }

@@ -123,6 +123,7 @@ public class ChunkEditingController : MonoBehaviour
 		if (!Physics.SphereCast(ray, 0.5f, out var hit, 1000f)) return;
 		
 		var chunkContainer = hit.transform.GetComponent<ChunkContainer>();
+		if (chunkContainer == null) return;
 		var hitInfoPoint = hit.point;
 		var hitPoint = new Vector3Int((int)hitInfoPoint.x, (int)hitInfoPoint.y, (int)hitInfoPoint.z);
 		chunkContainer.EditChunk(hitPoint, radius, add);
