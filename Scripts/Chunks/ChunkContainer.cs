@@ -7,7 +7,8 @@ public class ChunkContainer : MonoBehaviour
 {
 	internal bool markInactive;
 	internal Chunk chunk;
-	internal Vector3Int chunkPosition;
+	internal Vector3Int chunkPositionReal;
+	internal Vector3Int chunkPositionRelative;
 	internal bool chunkQueued;
 	internal bool hasCollider;
 
@@ -25,11 +26,12 @@ public class ChunkContainer : MonoBehaviour
 		transform.localScale = scale;
 	}
 
-	public void SetChunkPosition(Vector3Int position)
+	public void SetChunkPosition(Vector3Int positionRelative, Vector3Int realPosition)
 	{
 
-		chunkPosition = new Vector3Int(position.x, position.y, position.z);
-		transform.position = position;
+		chunkPositionRelative = positionRelative;
+		chunkPositionReal = realPosition;
+		transform.position = positionRelative;
 	}
 
 	public void SetChunkIndex()

@@ -87,7 +87,7 @@ public class ChunkManager : MonoBehaviour
 	public HashSet<Chunk> ChunksEditing { get; } = new();
 
 	internal HashSet<Vector3Int> knownKeys = new();
-	
+
 	private PlanetController planetController;
 	private Dictionary<Vector3Int, Chunk> chunks = new();
 	private List<ChunkContainer> chunkContainers = new();
@@ -126,7 +126,7 @@ public class ChunkManager : MonoBehaviour
 			}
 			var chunkChunkSize = chunkContainer.chunk.ChunkSize * chunkScale - 1;
 			var chunkChunkSizeHalfed = chunkChunkSize / 2;
-			var position = chunkContainer.chunkPosition +
+			var position = chunkContainer.chunkPositionReal +
 			               new Vector3(chunkChunkSizeHalfed, chunkChunkSizeHalfed, chunkChunkSizeHalfed);
 			Gizmos.DrawCube(position, new Vector3(5, 5, 5));
 		}
@@ -161,12 +161,12 @@ public class ChunkManager : MonoBehaviour
 	private void Update()
 	{
 		planetChunkManagerCenter = transform.position;
-		
+
 		if (planetController != null)
 		{
 			planetController.planetCenter = transform.position;
 		}
-		
+
 		var chunksPointCalculating = ChunkPointsCalculating.Keys.ToArray();
 		foreach (var chunk in chunksPointCalculating)
 		{
@@ -178,9 +178,9 @@ public class ChunkManager : MonoBehaviour
 		{
 			chunk.CheckIfEditDone();
 		}
-		
+
 		chunkQueue.CheckIfValidQueueReady(player.position);
-		
+
 		if (camera != null)
 		{
 			//frustum culling
@@ -202,13 +202,13 @@ public class ChunkManager : MonoBehaviour
 		if (!(currentDistance >= chunkUpdateDistance) && !forceUpdate) return;
 
 		forceUpdate = false;
-		playerLastPositionRelative = (player.position) * chunkScale;
+		playerLastPositionRelative = player.position - transform.position;
 
 		var playerPosition = new Vector3Int(
 			Mathf.RoundToInt(playerLastPositionRelative.x).RoundOff(chunkIncrement),
 			Mathf.RoundToInt(playerLastPositionRelative.y).RoundOff(chunkIncrement),
 			Mathf.RoundToInt(playerLastPositionRelative.z).RoundOff(chunkIncrement));
-		
+
 		Dictionary<Vector3Int, ChunkContainer> visibleContainers = new();
 
 		for (var x = playerPosition.x - horizontalViewDistance; x < playerPosition.x + horizontalViewDistance; x += chunkIncrement)
@@ -219,7 +219,7 @@ public class ChunkManager : MonoBehaviour
 				{
 					if (planetController != null)
 					{
-						var distanceFromCenter = Vector3.Distance(new Vector3(x, y, z), planetChunkManagerCenter);
+						var distanceFromCenter = Vector3.Distance(new Vector3(x, y, z), Vector3.zero);
 						var isWithinPlanet = distanceFromCenter <= planetController.planetSize * (2 * chunkScale);
 						if (!isWithinPlanet)
 						{
@@ -229,9 +229,13 @@ public class ChunkManager : MonoBehaviour
 
 					var currentChunkPosition = new Vector3Int(x, y, z);
 
-					visibleContainers.Add(currentChunkPosition, knownKeys.Contains(currentChunkPosition)
-						? LoadOrIgnoreChunk(currentChunkPosition)
-						: CreateChunk(currentChunkPosition));
+					var chunkPosition = currentChunkPosition + transform.position;
+					var chunkPositionInt = new Vector3Int((int)chunkPosition.x, (int)chunkPosition.y, (int)chunkPosition.z);
+					var chunkContainer = knownKeys.Contains(currentChunkPosition)
+						? LoadOrIgnoreChunk(currentChunkPosition, chunkPositionInt)
+						: CreateChunk(currentChunkPosition, chunkPositionInt);
+					chunkContainer.transform.rotation = transform.rotation;
+					visibleContainers.Add(currentChunkPosition, chunkContainer);
 				}
 			}
 		}
@@ -253,15 +257,15 @@ public class ChunkManager : MonoBehaviour
 
 		activeContainers = visibleContainers;
 	}
-	
-	private bool IsRendererVisible(Plane[] planes, Renderer renderer) 
+
+	private bool IsRendererVisible(Plane[] planes, Renderer renderer)
 	{
 		// Check if the renderer is within the view frustum of the camera
 		var visible = GeometryUtility.TestPlanesAABB(planes, renderer.bounds);
 		return visible;
 	}
 
-	private ChunkContainer LoadOrIgnoreChunk(Vector3Int currentChunkPosition)
+	private ChunkContainer LoadOrIgnoreChunk(Vector3Int currentChunkPosition, Vector3Int realPosition)
 	{
 		if (activeContainers.TryGetValue(currentChunkPosition, out var chunkContainer))
 		{
@@ -276,23 +280,23 @@ public class ChunkManager : MonoBehaviour
 			container.chunk = chunk;
 			chunk.CurrentChunkContainer = container;
 			container.SetActive();
-			container.SetChunkPosition(currentChunkPosition);
+			container.SetChunkPosition(currentChunkPosition, realPosition);
 			container.SetChunkIndex();
 			CheckChunkDistance(container);
 			return container;
 		}
 
-		return CreateChunk(currentChunkPosition);
+		return CreateChunk(currentChunkPosition, realPosition);
 	}
 
-	private ChunkContainer CreateChunk(Vector3Int currentChunkPosition)
+	private ChunkContainer CreateChunk(Vector3Int currentChunkPosition, Vector3Int realPosition)
 	{
 		knownKeys.Add(currentChunkPosition);
 
 		var chunkContainer = GetOrCreateInactiveContainer();
 
 		chunkContainer.SetActive();
-		chunkContainer.SetChunkPosition(currentChunkPosition);
+		chunkContainer.SetChunkPosition(currentChunkPosition, realPosition);
 
 		chunkContainer.chunkQueued = true;
 		chunkQueue.AddChunkToQueue(chunkContainer);
@@ -301,7 +305,7 @@ public class ChunkManager : MonoBehaviour
 
 	private void CheckChunkDistance(ChunkContainer chunkContainer)
 	{
-		var distance = Vector3.Distance(chunkContainer.chunkPosition, player.position);
+		var distance = Vector3.Distance(chunkContainer.chunkPositionReal, player.position);
 		if (distance < chunkIncrement * 2)
 		{
 			chunkContainer.CreateCollider();

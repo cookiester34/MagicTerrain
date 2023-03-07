@@ -30,7 +30,7 @@ public class ChunkQueue
 
 		public void CheckIfValidQueueReady(Vector3 playerPosition)
 		{
-			chunksInQueue = chunksInQueue.OrderBy(container => Vector3.Distance(container.chunkPosition, playerPosition)).ToList();
+			chunksInQueue = chunksInQueue.OrderBy(container => Vector3.Distance(container.chunkPositionReal, playerPosition)).ToList();
 
 			//removed chunks not needed
 			for (var index = chunksInQueue.Count - 1; index >= 0; index--)
@@ -38,7 +38,7 @@ public class ChunkQueue
 				var chunkContainer = chunksInQueue[index];
 				if (!chunkContainer.markInactive) continue;
 
-				chunkManager.knownKeys.Remove(chunkContainer.chunkPosition);
+				chunkManager.knownKeys.Remove(chunkContainer.chunkPositionReal);
 				chunksInQueue.RemoveAt(index);
 				chunkContainer.SetInactive();
 			}
@@ -58,7 +58,7 @@ public class ChunkQueue
 			if (chunksInQueue.Count <= 0) return;
 			var chunkContainer = chunksInQueue[0];
 
-			var chunkContainerChunkPosition = chunkContainer.chunkPosition;
+			var chunkContainerChunkPosition = chunkContainer.chunkPositionReal;
 			var chunk = new Chunk(new ChunkData
 			{
 				seed = chunkManager.Seed,
@@ -78,10 +78,10 @@ public class ChunkQueue
 				gainCaves = chunkManager.gainCaves,
 				chunkManager = chunkManager
 			},chunkManager.SmoothTerrain, chunkManager.FlatShaded);
-			
-			if (!chunkManager.Chunks.TryAdd(chunkContainerChunkPosition, chunk))
+
+			if (!chunkManager.Chunks.TryAdd(chunkContainer.chunkPositionRelative, chunk))
 			{
-				Debug.LogError($"Trying to create duplicate chunk at: {chunkContainerChunkPosition}");
+				Debug.LogError($"Trying to create duplicate chunk at: {chunkContainer.chunkPositionRelative}");
 				return;
 			}
 
