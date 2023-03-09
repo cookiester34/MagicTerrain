@@ -31,7 +31,7 @@ public class ChunkContainer : MonoBehaviour
 
 		chunkPositionRelative = positionRelative;
 		chunkPositionReal = realPosition;
-		transform.position = positionRelative;
+		transform.position = realPosition;
 	}
 
 	public void SetChunkIndex()

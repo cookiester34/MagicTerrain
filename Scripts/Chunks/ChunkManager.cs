@@ -202,7 +202,7 @@ public class ChunkManager : MonoBehaviour
 		if (!(currentDistance >= chunkUpdateDistance) && !forceUpdate) return;
 
 		forceUpdate = false;
-		playerLastPositionRelative = player.position - transform.position;
+		playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
 
 		var playerPosition = new Vector3Int(
 			Mathf.RoundToInt(playerLastPositionRelative.x).RoundOff(chunkIncrement),
@@ -227,15 +227,14 @@ public class ChunkManager : MonoBehaviour
 						}
 					}
 
-					var currentChunkPosition = new Vector3Int(x, y, z);
-
-					var chunkPosition = currentChunkPosition + transform.position;
-					var chunkPositionInt = new Vector3Int((int)chunkPosition.x, (int)chunkPosition.y, (int)chunkPosition.z);
-					var chunkContainer = knownKeys.Contains(currentChunkPosition)
-						? LoadOrIgnoreChunk(currentChunkPosition, chunkPositionInt)
-						: CreateChunk(currentChunkPosition, chunkPositionInt);
-					chunkContainer.transform.rotation = transform.rotation;
-					visibleContainers.Add(currentChunkPosition, chunkContainer);
+					var localSpaceChunkPosition = Vector3Int.RoundToInt(new Vector3(x, y, z));
+					var rotatedPosition = Matrix4x4.Rotate(transform.rotation).MultiplyPoint(new Vector3(x, y, z));
+					var worldSpaceChunkPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z) + transform.position;
+					var worldSpaceChunkPositionInt = new Vector3Int((int)worldSpaceChunkPosition.x, (int)worldSpaceChunkPosition.y, (int)worldSpaceChunkPosition.z);
+					var chunkContainer = knownKeys.Contains(localSpaceChunkPosition)
+						? LoadOrIgnoreChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt)
+						: CreateChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt);
+					visibleContainers.Add(localSpaceChunkPosition, chunkContainer);
 				}
 			}
 		}
