@@ -12,7 +12,7 @@ namespace Scripts.Chunks.Jobs
 		public int chunkSize;
 
 		[ReadOnly]
-		public Vector3Int chunkPosition;
+		public Vector3 chunkPosition;
 
 		[ReadOnly]
 		public bool isPlanet;

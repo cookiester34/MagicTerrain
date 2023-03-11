@@ -1,6 +1,4 @@
-﻿using Scripts;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using UnityEngine;
 
 public class ChunkContainer : MonoBehaviour
@@ -26,11 +24,16 @@ public class ChunkContainer : MonoBehaviour
 		transform.localScale = scale;
 	}
 
-	public void SetChunkPosition(Vector3Int positionRelative, Vector3Int realPosition)
+	public void SetChunkPosition(Vector3Int positionRelative, Vector3Int realPositionInt, Vector3 realPosition)
 	{
 
 		chunkPositionRelative = positionRelative;
-		chunkPositionReal = realPosition;
+		chunkPositionReal = realPositionInt;
+		transform.localPosition = realPosition;
+	}
+
+	public void UpdateChunkPosition(Vector3 realPosition)
+	{
 		transform.position = realPosition;
 	}
 

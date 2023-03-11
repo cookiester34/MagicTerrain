@@ -198,11 +198,12 @@ public class ChunkManager : MonoBehaviour
 			}
 		}
 
-		var currentDistance = Vector3.Distance(player.position, playerLastPositionRelative);
+		var playerPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
+		var currentDistance = Vector3.Distance(playerLastPositionRelative, playerPositionRelative);
 		if (!(currentDistance >= chunkUpdateDistance) && !forceUpdate) return;
+		playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
 
 		forceUpdate = false;
-		playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
 
 		var playerPosition = new Vector3Int(
 			Mathf.RoundToInt(playerLastPositionRelative.x).RoundOff(chunkIncrement),
@@ -217,9 +218,10 @@ public class ChunkManager : MonoBehaviour
 			{
 				for (var z = playerPosition.z - horizontalViewDistance; z < playerPosition.z + horizontalViewDistance; z += chunkIncrement)
 				{
+					var position = Vector3Int.RoundToInt(new Vector3(x, y, z));
 					if (planetController != null)
 					{
-						var distanceFromCenter = Vector3.Distance(new Vector3(x, y, z), Vector3.zero);
+						var distanceFromCenter = Vector3.Distance(position, Vector3.zero);
 						var isWithinPlanet = distanceFromCenter <= planetController.planetSize * (2 * chunkScale);
 						if (!isWithinPlanet)
 						{
@@ -227,13 +229,14 @@ public class ChunkManager : MonoBehaviour
 						}
 					}
 
-					var localSpaceChunkPosition = Vector3Int.RoundToInt(new Vector3(x, y, z));
-					var rotatedPosition = Matrix4x4.Rotate(transform.rotation).MultiplyPoint(new Vector3(x, y, z));
+					var localSpaceChunkPosition = position;
+					var rotatedPosition = Matrix4x4.Rotate(transform.rotation).MultiplyPoint(position);
 					var worldSpaceChunkPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z) + transform.position;
-					var worldSpaceChunkPositionInt = new Vector3Int((int)worldSpaceChunkPosition.x, (int)worldSpaceChunkPosition.y, (int)worldSpaceChunkPosition.z);
+					var worldSpaceChunkPositionInt = Vector3Int.RoundToInt(worldSpaceChunkPosition);
 					var chunkContainer = knownKeys.Contains(localSpaceChunkPosition)
-						? LoadOrIgnoreChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt)
-						: CreateChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt);
+						? LoadOrCreateChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt, worldSpaceChunkPosition)
+						: CreateChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt, worldSpaceChunkPosition);
+					chunkContainer.transform.rotation = transform.rotation;
 					visibleContainers.Add(localSpaceChunkPosition, chunkContainer);
 				}
 			}
@@ -264,10 +267,11 @@ public class ChunkManager : MonoBehaviour
 		return visible;
 	}
 
-	private ChunkContainer LoadOrIgnoreChunk(Vector3Int currentChunkPosition, Vector3Int realPosition)
+	private ChunkContainer LoadOrCreateChunk(Vector3Int currentChunkPosition, Vector3Int realPosition, Vector3 worldSpaceChunkPosition)
 	{
 		if (activeContainers.TryGetValue(currentChunkPosition, out var chunkContainer))
 		{
+			chunkContainer.UpdateChunkPosition(worldSpaceChunkPosition);
 			CheckChunkDistance(chunkContainer);
 			return chunkContainer;
 		}
@@ -279,23 +283,23 @@ public class ChunkManager : MonoBehaviour
 			container.chunk = chunk;
 			chunk.CurrentChunkContainer = container;
 			container.SetActive();
-			container.SetChunkPosition(currentChunkPosition, realPosition);
+			container.SetChunkPosition(currentChunkPosition, realPosition, worldSpaceChunkPosition);
 			container.SetChunkIndex();
 			CheckChunkDistance(container);
 			return container;
 		}
 
-		return CreateChunk(currentChunkPosition, realPosition);
+		return CreateChunk(currentChunkPosition, realPosition, worldSpaceChunkPosition);
 	}
 
-	private ChunkContainer CreateChunk(Vector3Int currentChunkPosition, Vector3Int realPosition)
+	private ChunkContainer CreateChunk(Vector3Int currentChunkPosition, Vector3Int realPosition, Vector3 worldSpaceChunkPosition)
 	{
 		knownKeys.Add(currentChunkPosition);
 
 		var chunkContainer = GetOrCreateInactiveContainer();
 
 		chunkContainer.SetActive();
-		chunkContainer.SetChunkPosition(currentChunkPosition, realPosition);
+		chunkContainer.SetChunkPosition(currentChunkPosition, realPosition, worldSpaceChunkPosition);
 
 		chunkContainer.chunkQueued = true;
 		chunkQueue.AddChunkToQueue(chunkContainer);

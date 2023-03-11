@@ -38,7 +38,7 @@ public class ChunkQueue
 				var chunkContainer = chunksInQueue[index];
 				if (!chunkContainer.markInactive) continue;
 
-				chunkManager.knownKeys.Remove(chunkContainer.chunkPositionReal);
+				chunkManager.knownKeys.Remove(chunkContainer.chunkPositionRelative);
 				chunksInQueue.RemoveAt(index);
 				chunkContainer.SetInactive();
 			}
