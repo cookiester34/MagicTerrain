@@ -148,6 +148,7 @@ public class ChunkManager : MonoBehaviour
 			chunkContainer.SetInactive();
 			chunkContainer.transform.SetParent(transform);
 			chunkContainers.Add(chunkContainer);
+			chunkContainer.transform.position = Vector3.zero;
 		}
 
 		chunkIncrement = chunkSize * chunkScale;
@@ -196,6 +197,11 @@ public class ChunkManager : MonoBehaviour
 			{
 				activeContainer.Value.SetVisible(true);
 			}
+		}
+
+		foreach (var chunkContainer in activeContainers)
+		{
+			chunkContainer.Value.SetPlanetCenter(transform.position);
 		}
 
 		var playerPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
