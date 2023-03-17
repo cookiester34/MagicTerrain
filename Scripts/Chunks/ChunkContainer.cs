@@ -29,7 +29,7 @@ public class ChunkContainer : MonoBehaviour
 
 		chunkPositionRelative = positionRelative;
 		chunkPositionReal = realPositionInt;
-		transform.localPosition = realPosition;
+		transform.position = realPosition;
 	}
 
 	public void UpdateChunkPosition(Vector3 realPosition)

@@ -10,6 +10,7 @@ using UnityEngine;
 [Serializable]
 public class Chunk
 {
+	public bool HasMeshes => meshes != null && meshes.Length > 0;
 	public Mesh[] Meshes { get => meshes; set => meshes = value; }
 	public int ChunkSize { get; }
 	public ChunkContainer CurrentChunkContainer { get; set; }
@@ -37,7 +38,6 @@ public class Chunk
 	private CreateMeshDataJob createMeshJob;
 	private JobHandle getCircleJobHandler;
 	private JobHandle editTerrainMapHandler;
-	private float[] localTerrainMap;
 
 	private NativeArray<EditedChunkPointValue> points;
 	private NativeArray<float> terrainMap;
@@ -46,13 +46,16 @@ public class Chunk
 	private NativeArray<float> cube;
 	private NativeArray<int> triangleCount;
 	private NativeArray<int> vertCount;
-	private Mesh[] meshes;
-	
 	private NativeArray<EditedChunkPointValue> chunkPointValues;
 	private NativeArray<bool> wasEdited;
+	
+	private Mesh[] meshes;
 
 	[SerializeField]
 	private Vector3Int chunkPosition;
+	
+	[SerializeField]
+	private float[] localTerrainMap;
 
 	[SerializeField]
 	private Vector3[] chunkVertices;
@@ -190,6 +193,20 @@ public class Chunk
 			chunkVertices[i] = vertices[i];
 		}
 
+		CreateMesh();
+
+		vertices.Dispose();
+		triangles.Dispose();
+		cube.Dispose();
+		triangleCount.Dispose();
+		vertCount.Dispose();
+
+		localTerrainMap = terrainMap.ToArray();
+		terrainMap.Dispose();
+	}
+
+	public void CreateMesh()
+	{
 		Meshes = new[]
 		{
 			new Mesh
@@ -202,15 +219,6 @@ public class Chunk
 		{
 			mesh.RecalculateNormals();
 		}
-
-		vertices.Dispose();
-		triangles.Dispose();
-		cube.Dispose();
-		triangleCount.Dispose();
-		vertCount.Dispose();
-
-		localTerrainMap = terrainMap.ToArray();
-		terrainMap.Dispose();
 	}
 
 	public void EditChunk(Vector3 hitPoint, float radius, bool add)

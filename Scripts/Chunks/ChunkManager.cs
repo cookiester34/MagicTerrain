@@ -1,9 +1,13 @@
+using Scripts.Chunks;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 public class ChunkManager : MonoBehaviour
 {
+	[SerializeField]
+	private PreGeneratePlanet preGeneratePlanet;
+	
 	[SerializeField]
 	private int chunkPoolCount = 20;
 
@@ -150,11 +154,35 @@ public class ChunkManager : MonoBehaviour
 			chunkContainers.Add(chunkContainer);
 		}
 
-		chunkIncrement = chunkSize * chunkScale;
 		if (planetController != null)
 		{
 			planetController.planetCenterRaw = transform.position;
+			if (preGeneratePlanet != null)
+			{
+				planetController.planetSize = preGeneratePlanet.planetSize;
+				octaves = preGeneratePlanet.octaves;
+				weightedStrength = preGeneratePlanet.weightedStrength;
+				lacunarity = preGeneratePlanet.lacunarity;
+				gain = preGeneratePlanet.gain;
+				octavesCaves = preGeneratePlanet.octavesCaves;
+				weightedStrengthCaves = preGeneratePlanet.weightedStrengthCaves;
+				lacunarityCaves = preGeneratePlanet.lacunarityCaves;
+				gainCaves = preGeneratePlanet.gainCaves;
+				domainWarpAmp = preGeneratePlanet.domainWarpAmp;
+				chunkSize = preGeneratePlanet.chunkSize;
+				chunkScale = preGeneratePlanet.chunkScale;
+				seed = preGeneratePlanet.seed;
+				smoothTerrain = preGeneratePlanet.smoothTerrain;
+				flatShaded = preGeneratePlanet.flatShaded;
+				foreach (var chunk in preGeneratePlanet.chunks)
+				{
+					chunk.Value.CreateMesh();
+					knownKeys.Add(chunk.Key);
+					chunks.Add(chunk.Key, chunk.Value);
+				}
+			}
 		}
+		chunkIncrement = chunkSize * chunkScale;
 		planetChunkManagerCenter = transform.position;
 	}
 
