@@ -15,6 +15,7 @@ public class ChunkContainer : MonoBehaviour
 	public MeshRenderer MeshRenderer => meshRenderer;
 	private MeshCollider meshCollider;
 	private Vector3 scale;
+	private static readonly int property = Shader.PropertyToID("_PlanetCorePosition");
 
 	public bool IsActive => !markInactive;
 
@@ -26,7 +27,6 @@ public class ChunkContainer : MonoBehaviour
 
 	public void SetChunkPosition(Vector3Int positionRelative, Vector3Int realPositionInt, Vector3 realPosition)
 	{
-
 		chunkPositionRelative = positionRelative;
 		chunkPositionReal = realPositionInt;
 		transform.position = realPosition;
@@ -35,6 +35,14 @@ public class ChunkContainer : MonoBehaviour
 	public void UpdateChunkPosition(Vector3 realPosition)
 	{
 		transform.position = realPosition;
+	}
+
+	public void SetPlanetCenter(Vector3 planetCenter)
+	{
+		if (meshRenderer != null)
+		{
+			MeshRenderer.sharedMaterial.SetVector(property, new Vector4(planetCenter.x, planetCenter.y, planetCenter.z));
+		}
 	}
 
 	public void SetChunkIndex()
