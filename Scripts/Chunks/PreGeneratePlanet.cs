@@ -96,7 +96,7 @@ namespace Scripts.Chunks
 						var chunk = new Chunk(new ChunkData
 						{
 							seed = seed,
-							chunkPosition = currentChunkPosition,
+							chunkPositionReal = currentChunkPosition,
 							chunkSize = chunkSize,
 							scale = chunkScale,
 							planetCenter = Vector3.zero,

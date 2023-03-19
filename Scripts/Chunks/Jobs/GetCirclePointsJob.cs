@@ -9,7 +9,9 @@ namespace Scripts.Chunks.Jobs
 	public struct GetCirclePointsJob : IJob
 	{
 		[ReadOnly]
-		public Vector3Int chunkPosition;
+		public Vector3 chunkPosition;
+		[ReadOnly]
+		public Matrix4x4 worldMatrix;
 		[ReadOnly]
 		public int scale;
 		[ReadOnly]
@@ -28,19 +30,22 @@ namespace Scripts.Chunks.Jobs
 		{
 			arrayIndex = 0;
 			var posInt = new Vector3(hitPosition.x, hitPosition.y, hitPosition.z);
+			var roationMatrix = worldMatrix.rotation;
+			var rotationToWorldMatrix =
+				Matrix4x4.TRS(worldMatrix.GetColumn(3), roationMatrix, Vector3.one);
 			var chunkTranslation = Matrix4x4.Translate(chunkPosition);
 			var chunkScale = Matrix4x4.Scale(new Vector3(scale, scale, scale));
-			var chunkTransformation = chunkScale * chunkTranslation;
+			var chunkTransformation = (chunkScale * chunkTranslation);
 			
-			var radiusCeil = Mathf.CeilToInt(radius); // is 50
-			for (var i = -radiusCeil; i <= radiusCeil; i++) // from -50 to 50
+			var radiusCeil = Mathf.CeilToInt(radius);
+			for (var i = -radiusCeil; i <= radiusCeil; i++)
 			{
-				for (var j = -radiusCeil; j <= radiusCeil; j++)// from -50 to 50
+				for (var j = -radiusCeil; j <= radiusCeil; j++)
 				{
-					for (var k = -radiusCeil; k <= radiusCeil; k++)// from -50 to 50
+					for (var k = -radiusCeil; k <= radiusCeil; k++)
 					{
 						var gridPoint = new Vector3(posInt.x + i,posInt.y + j,posInt.z + k);
-						var multiplyPoint = chunkTransformation.inverse.MultiplyPoint(
+						var multiplyPoint = (rotationToWorldMatrix * chunkTransformation).inverse.MultiplyPoint(
 							new Vector3Int((int)gridPoint.x,
 							(int)gridPoint.y,
 							(int)gridPoint.z));

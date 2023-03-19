@@ -4,7 +4,8 @@ public struct ChunkData
 {
 	public int seed;
 	public int chunkSize;
-	public Vector3Int chunkPosition;
+	public Vector3Int chunkPositionReal;
+	public Vector3Int chunkPositionRelative;
 	public int scale;
 	public float planetSize;
 	public Vector3 planetCenter;

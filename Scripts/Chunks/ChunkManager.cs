@@ -196,36 +196,11 @@ public class ChunkManager : MonoBehaviour
 			planetController.planetCenter = transform.position;
 		}
 
-		var chunksPointCalculating = ChunkPointsCalculating.Keys.ToArray();
-		foreach (var chunk in chunksPointCalculating)
-		{
-			chunk.CheckEditedPointsDone(ChunkPointsCalculating[chunk]);
-		}
-
-		var chunksToEdit = ChunksEditing.ToArray();
-		foreach (var chunk in chunksToEdit)
-		{
-			chunk.CheckIfEditDone();
-		}
+		CheckChunkEdits();
 
 		chunkQueue.CheckIfValidQueueReady(player.position);
 
-		if (camera != null)
-		{
-			//frustum culling
-			var planes = GeometryUtility.CalculateFrustumPlanes(camera);
-			foreach (var activeContainer in activeContainers)
-			{
-				activeContainer.Value.SetVisible(IsRendererVisible(planes, activeContainer.Value.MeshRenderer));
-			}
-		}
-		else
-		{
-			foreach (var activeContainer in activeContainers)
-			{
-				activeContainer.Value.SetVisible(true);
-			}
-		}
+		CalculateFrustrumCulling();
 
 		foreach (var chunkContainer in activeContainers)
 		{
@@ -235,6 +210,12 @@ public class ChunkManager : MonoBehaviour
 		var playerPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
 		var currentDistance = Vector3.Distance(playerLastPositionRelative, playerPositionRelative);
 		if (!(currentDistance >= chunkUpdateDistance) && !forceUpdate) return;
+		
+		CalculcateVisibleChunks();
+	}
+
+	private void CalculcateVisibleChunks() //TODO: should be affected by scale
+	{
 		playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(player.position);
 
 		forceUpdate = false;
@@ -246,11 +227,17 @@ public class ChunkManager : MonoBehaviour
 
 		Dictionary<Vector3Int, ChunkContainer> visibleContainers = new();
 
-		for (var x = playerPosition.x - horizontalViewDistance; x < playerPosition.x + horizontalViewDistance; x += chunkIncrement)
+		for (var x = playerPosition.x - horizontalViewDistance;
+		     x < playerPosition.x + horizontalViewDistance;
+		     x += chunkIncrement)
 		{
-			for (var y = playerPosition.y - verticalViewDistance; y < playerPosition.y + verticalViewDistance; y += chunkIncrement)
+			for (var y = playerPosition.y - verticalViewDistance;
+			     y < playerPosition.y + verticalViewDistance;
+			     y += chunkIncrement)
 			{
-				for (var z = playerPosition.z - horizontalViewDistance; z < playerPosition.z + horizontalViewDistance; z += chunkIncrement)
+				for (var z = playerPosition.z - horizontalViewDistance;
+				     z < playerPosition.z + horizontalViewDistance;
+				     z += chunkIncrement)
 				{
 					var position = Vector3Int.RoundToInt(new Vector3(x, y, z));
 					if (planetController != null)
@@ -265,7 +252,8 @@ public class ChunkManager : MonoBehaviour
 
 					var localSpaceChunkPosition = position;
 					var rotatedPosition = Matrix4x4.Rotate(transform.rotation).MultiplyPoint(position);
-					var worldSpaceChunkPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z) + transform.position;
+					var worldSpaceChunkPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z) +
+					                              transform.position;
 					var worldSpaceChunkPositionInt = Vector3Int.RoundToInt(worldSpaceChunkPosition);
 					var chunkContainer = knownKeys.Contains(localSpaceChunkPosition)
 						? LoadOrCreateChunk(localSpaceChunkPosition, worldSpaceChunkPositionInt, worldSpaceChunkPosition)
@@ -292,6 +280,41 @@ public class ChunkManager : MonoBehaviour
 		}
 
 		activeContainers = visibleContainers;
+	}
+
+	private void CalculateFrustrumCulling()
+	{
+		if (camera != null)
+		{
+			//frustum culling
+			var planes = GeometryUtility.CalculateFrustumPlanes(camera);
+			foreach (var activeContainer in activeContainers)
+			{
+				activeContainer.Value.SetVisible(IsRendererVisible(planes, activeContainer.Value.MeshRenderer));
+			}
+		}
+		else
+		{
+			foreach (var activeContainer in activeContainers)
+			{
+				activeContainer.Value.SetVisible(true);
+			}
+		}
+	}
+
+	private void CheckChunkEdits()
+	{
+		var chunksPointCalculating = ChunkPointsCalculating.Keys.ToArray();
+		foreach (var chunk in chunksPointCalculating)
+		{
+			chunk.CheckEditedPointsDone(ChunkPointsCalculating[chunk]);
+		}
+
+		var chunksToEdit = ChunksEditing.ToArray();
+		foreach (var chunk in chunksToEdit)
+		{
+			chunk.CheckIfEditDone();
+		}
 	}
 
 	private bool IsRendererVisible(Plane[] planes, Renderer renderer)

@@ -62,7 +62,8 @@ public class ChunkQueue
 			var chunk = new Chunk(new ChunkData
 			{
 				seed = chunkManager.Seed,
-				chunkPosition = chunkContainerChunkPosition,
+				chunkPositionReal = chunkContainerChunkPosition,
+				chunkPositionRelative = chunkContainer.chunkPositionRelative,
 				chunkSize = chunkManager.ChunkSize,
 				scale = chunkManager.ChunkScale,
 				planetCenter = planetController == null ? Vector3.zero : planetController.planetCenterRaw,

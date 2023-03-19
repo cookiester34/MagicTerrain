@@ -6,6 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [Serializable]
 public class Chunk
@@ -14,7 +15,7 @@ public class Chunk
 	public Mesh[] Meshes { get => meshes; set => meshes = value; }
 	public int ChunkSize { get; }
 	public ChunkContainer CurrentChunkContainer { get; set; }
-	private Vector3Int ChunkPosition => chunkPosition;
+	private Vector3Int ChunkPositionReal => chunkPositionReal;
 
 	private readonly float terrainSurface = 0.5f;
 	private readonly int seed;
@@ -52,7 +53,10 @@ public class Chunk
 	private Mesh[] meshes;
 
 	[SerializeField]
-	private Vector3Int chunkPosition;
+	private Vector3Int chunkPositionReal;
+	
+	[SerializeField]
+	private Vector3Int chunkPositionRelative;
 	
 	[SerializeField]
 	private float[] localTerrainMap;
@@ -73,7 +77,8 @@ public class Chunk
 		ChunkSize = chunkData.chunkSize;
 		ChunkSize++;
 		seed = chunkData.seed;
-		chunkPosition = chunkData.chunkPosition / chunkData.scale;
+		chunkPositionReal = chunkData.chunkPositionReal / chunkData.scale;
+		chunkPositionRelative = chunkData.chunkPositionRelative;
 		this.smooth = smooth;
 		this.flatShaded = flatShaded;
 		planetSize = chunkData.planetSize;
@@ -133,7 +138,7 @@ public class Chunk
 			Allocator.Persistent);
 		populateTerrainJob = new PopulateTerrainMapJob
 		{
-			chunkPosition = ChunkPosition,
+			chunkPosition = ChunkPositionReal,
 			chunkSize = ChunkSize,
 			terrainMap = terrainMap,
 			seed = seed,
@@ -223,7 +228,7 @@ public class Chunk
 
 	public void EditChunk(Vector3 hitPoint, float radius, bool add)
 	{
-		var neighbourChunks = chunkManager.GetNeighbourChunks(ChunkPosition * scale);
+		var neighbourChunks = chunkManager.GetNeighbourChunks(chunkPositionRelative * scale);
 
 		if (neighbourChunks.Any(x => x.IsProccessing)) return;
 
@@ -232,8 +237,7 @@ public class Chunk
 		var arraySize = ceilToInt * ceilToInt * ceilToInt;
 		points = new NativeArray<EditedChunkPointValue>(arraySize, Allocator.Persistent);
 		
-		getCircleJobHandler = GetCirclePointJobs(hitPoint, radius, add).Schedule();
-
+		getCircleJobHandler = GetCirclePointJobs(hitPoint, chunkManager.transform.rotation, radius, add).Schedule();
 		if (!chunkManager.ChunkPointsCalculating.TryAdd(this, add))
 		{
 			Debug.LogError("Failed to add chunk to edit queue, cancelling edit");
@@ -244,17 +248,16 @@ public class Chunk
 		JobHandle.ScheduleBatchedJobs();
 	}
 
-	public async void CheckEditedPointsDone(bool add)
+	public void CheckEditedPointsDone(bool add)
 	{
 		if (!getCircleJobHandler.IsCompleted) return;
 		
 		getCircleJobHandler.Complete();
 
-			
-		var neighbourChunks = chunkManager.GetNeighbourChunks(ChunkPosition * scale);
+		var neighbourChunks = chunkManager.GetNeighbourChunks(chunkPositionRelative * scale);
 		foreach (var neighbourChunk in neighbourChunks)
 		{
-			var diferenceInPosition = ChunkPosition - neighbourChunk.ChunkPosition;
+			var diferenceInPosition = ChunkPositionReal - neighbourChunk.ChunkPositionReal;
 			neighbourChunk.EditChunkJob(diferenceInPosition, points, add);
 		}
 
@@ -279,7 +282,6 @@ public class Chunk
 		};
 		
 		editTerrainMapHandler = editTerrainMapJob.Schedule(chunkPointValues.Length, 60);
-
 		chunkManager.ChunksEditing.Add(this);
 	}
 
@@ -306,15 +308,17 @@ public class Chunk
 		return true;
 	}
 
-	private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, float radius, bool add)
+	private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, Quaternion transformRotation, float radius,
+		bool add)
 	{
 		var getCirclePointsJob = new GetCirclePointsJob()
 		{
 			hitPosition = hitPoint,
+			worldMatrix = chunkManager.transform.localToWorldMatrix,
 			add = add,
 			radius = radius,
 			points = points,
-			chunkPosition = ChunkPosition,
+			chunkPosition = chunkPositionReal,
 			scale = scale
 		};
 		return getCirclePointsJob;
