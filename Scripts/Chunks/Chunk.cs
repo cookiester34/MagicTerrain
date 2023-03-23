@@ -49,15 +49,15 @@ public class Chunk
 	private NativeArray<int> vertCount;
 	private NativeArray<EditedChunkPointValue> chunkPointValues;
 	private NativeArray<bool> wasEdited;
-	
+
 	private Mesh[] meshes;
 
 	[SerializeField]
 	private Vector3Int chunkPositionReal;
-	
+
 	[SerializeField]
 	private Vector3Int chunkPositionRelative;
-	
+
 	[SerializeField]
 	private float[] localTerrainMap;
 
@@ -236,7 +236,7 @@ public class Chunk
 		var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 		var arraySize = ceilToInt * ceilToInt * ceilToInt;
 		points = new NativeArray<EditedChunkPointValue>(arraySize, Allocator.Persistent);
-		
+
 		getCircleJobHandler = GetCirclePointJobs(hitPoint, chunkManager.transform.rotation, radius, add).Schedule();
 		if (!chunkManager.ChunkPointsCalculating.TryAdd(this, add))
 		{
@@ -244,14 +244,14 @@ public class Chunk
 			points.Dispose();
 			return;
 		}
-		
+
 		JobHandle.ScheduleBatchedJobs();
 	}
 
 	public void CheckEditedPointsDone(bool add)
 	{
 		if (!getCircleJobHandler.IsCompleted) return;
-		
+
 		getCircleJobHandler.Complete();
 
 		var neighbourChunks = chunkManager.GetNeighbourChunks(chunkPositionRelative * scale);
@@ -280,7 +280,7 @@ public class Chunk
 			terrainMap = terrainMap,
 			wasEdited = wasEdited
 		};
-		
+
 		editTerrainMapHandler = editTerrainMapJob.Schedule(chunkPointValues.Length, 60);
 		chunkManager.ChunksEditing.Add(this);
 	}
@@ -288,7 +288,7 @@ public class Chunk
 	public bool CheckIfEditDone()
 	{
 		if (!editTerrainMapHandler.IsCompleted) return false;
-		
+
 		editTerrainMapHandler.Complete();
 
 		chunkPointValues.Dispose();
@@ -314,7 +314,9 @@ public class Chunk
 		var getCirclePointsJob = new GetCirclePointsJob()
 		{
 			hitPosition = hitPoint,
-			worldMatrix = chunkManager.transform.localToWorldMatrix,
+			worldRotation = chunkManager.transform.rotation,
+			chunkRotation = CurrentChunkContainer.transform.rotation,
+			worldPositon = CurrentChunkContainer.transform.position,
 			add = add,
 			radius = radius,
 			points = points,
