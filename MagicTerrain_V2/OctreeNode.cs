@@ -172,7 +172,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		{
 			if (IsDisabled) return;
 
-			Gizmos.color = IsLoaded ? Color.green : Color.cyan;
+			Gizmos.color = Color.cyan;
 			Gizmos.DrawWireCube(position, new Vector3(size, size, size));
 
 			if (children?[0] == null) return;
