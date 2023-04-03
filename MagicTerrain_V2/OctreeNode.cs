@@ -5,28 +5,30 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 	public class OctreeNode
 	{
 		private ChunkCore chunkCore;
-		
-		private Vector3 position;
-		
+
+		private Vector3Int position;
+		public Vector3Int Position => position;
+
 		private int size;
-		
+
 		private int minSize;
-		
+
 		private OctreeNode[] children;
 
-		private Chunk chunk;
-		
+		private ChunkContainer chunkContainer;
+		public ChunkContainer ChunkContainer => chunkContainer;
+
 		public bool IsChunkNode => size <= minSize;
-		
+
 		public bool IsLoaded { get; private set; }
-		
+
 		public bool IsDisabled { get; private set; }
-		
+
 		public bool IsEnabled => !IsDisabled;
-		
+
 		public bool IsVisible { get; private set; }
-		
-		public OctreeNode(Vector3 position, int size, int minSize, ChunkCore chunkCore)
+
+		public OctreeNode(Vector3Int position, int size, int minSize, ChunkCore chunkCore)
 		{
 			this.chunkCore = chunkCore;
 			this.position = position;
@@ -34,16 +36,27 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			this.minSize = minSize;
 
 			if (IsChunkNode) return;
-			
+
 			children = new OctreeNode[8];
 			Subdivide();
+		}
+
+		public void RequestChunk()
+		{
+			chunkContainer = chunkCore.RequestChunkContainer(chunkCore.RequestChunk(position));
+		}
+
+		public void ReturnChunk()
+		{
+			chunkContainer.UnAssignChunk();
+			chunkContainer = null;
 		}
 
 		public void SetNotVisible()
 		{
 			IsVisible = false;
 		}
-		
+
 		public void EnableVisibleNodes(Vector3 point)
 		{
 			if (IsVisible)
@@ -51,15 +64,15 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				CheckIfChildNodesAreVisible(point);
 				return;
 			}
-			
+
 			if (!Contains(point)) return;
-			
+
 			CheckIfChildNodesAreVisible(point);
 
 			if (IsLoaded) return;
 			if (IsChunkNode)
 			{
-				//Request chunk & chunk container from ChunkCore
+				RequestChunk();
 				IsLoaded = true;
 			}
 			IsDisabled = false;
@@ -70,7 +83,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void CheckIfChildNodesAreVisible(Vector3 point)
 		{
 			if (children == null) return;
-			
+
 			foreach (var node in children)
 			{
 				node?.EnableVisibleNodes(point);
@@ -80,26 +93,16 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		public void DisableNonVisibleNodes()
 		{
 			if (children == null) return;
-			
+
 			foreach (var node in children)
 			{
 				node.DisableNonVisibleNodes();
 			}
-			
+
 			if (IsVisible || IsDisabled) return;
 			IsDisabled = true;
 			IsLoaded = false;
-			//unload the chunk & return the chunk container
-		}
-		
-		public void CreateChunk()
-		{
-			if (!IsChunkNode)
-			{
-				Debug.LogWarning("Cannot create a chunk in node that is not the same size as a chunk");;
-				return;
-			}
-			chunk = new Chunk(position, size);
+			ReturnChunk();
 		}
 
 		public OctreeNode FindNode(Vector3 position)
@@ -133,17 +136,17 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			{
 				return;
 			}
-			
+
 			var quarterSize = size / 4;
-			
-			children[0] = new OctreeNode(position + new Vector3(-quarterSize, -quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
-			children[1] = new OctreeNode(position + new Vector3(quarterSize, -quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
-			children[2] = new OctreeNode(position + new Vector3(-quarterSize, -quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
-			children[3] = new OctreeNode(position + new Vector3(quarterSize, -quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
-			children[4] = new OctreeNode(position + new Vector3(-quarterSize, quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
-			children[5] = new OctreeNode(position + new Vector3(quarterSize, quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
-			children[6] = new OctreeNode(position + new Vector3(-quarterSize, quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
-			children[7] = new OctreeNode(position + new Vector3(quarterSize, quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
+
+			children[0] = new OctreeNode(position + new Vector3Int(-quarterSize, -quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
+			children[1] = new OctreeNode(position + new Vector3Int(quarterSize, -quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
+			children[2] = new OctreeNode(position + new Vector3Int(-quarterSize, -quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
+			children[3] = new OctreeNode(position + new Vector3Int(quarterSize, -quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
+			children[4] = new OctreeNode(position + new Vector3Int(-quarterSize, quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
+			children[5] = new OctreeNode(position + new Vector3Int(quarterSize, quarterSize, -quarterSize), newNodeSize, minSize, chunkCore);
+			children[6] = new OctreeNode(position + new Vector3Int(-quarterSize, quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
+			children[7] = new OctreeNode(position + new Vector3Int(quarterSize, quarterSize, quarterSize), newNodeSize, minSize, chunkCore);
 		}
 
 		private int GetChildIndex(Vector3 position)
