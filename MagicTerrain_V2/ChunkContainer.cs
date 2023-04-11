@@ -2,30 +2,47 @@
 
 namespace SubModules.MagicTerrain.MagicTerrain_V2
 {
-	public class ChunkContainer
+	public class ChunkContainer : MonoBehaviour
 	{
-		private Chunk chunk;
-		public Chunk Chunk => chunk;
+		private MeshCollider meshCollider;
 
 		private MeshRenderer meshRenderer;
 
-		private MeshCollider meshCollider;
+		private MeshFilter meshFilter;
 
-		public bool IsUsed => chunk != null;
+		[field:SerializeField]
+		public Chunk Chunk { get; private set; }
 
-		public ChunkContainer()
-		{
-
-		}
+		public bool IsUsed => Chunk != null;
 
 		public void AssignChunk(Chunk newChunk)
 		{
-			chunk = newChunk;
+			Chunk = newChunk;
 		}
 
 		public void UnAssignChunk()
 		{
-			chunk = null;
+			Chunk = null;
+			CheckContainerHasComponents();
+			meshFilter.sharedMesh = null;
+			// meshCollider.sharedMesh = null;
+		}
+
+		public void CreateChunkMesh(Material material)
+		{
+			if (Chunk?.Meshes == null) return;
+			if (Chunk.Meshes.Length == 0) return;
+			CheckContainerHasComponents();
+			meshRenderer.material = material;
+			meshFilter.sharedMesh = Chunk.Meshes[0];
+			// meshCollider.sharedMesh = Chunk.Meshes[0];
+		}
+
+		private void CheckContainerHasComponents()
+		{
+			if (meshRenderer == null) meshRenderer = gameObject.AddComponent<MeshRenderer>();
+			if (meshCollider == null) meshCollider = gameObject.AddComponent<MeshCollider>();
+			if (meshFilter == null) meshFilter = gameObject.AddComponent<MeshFilter>();
 		}
 	}
 }
