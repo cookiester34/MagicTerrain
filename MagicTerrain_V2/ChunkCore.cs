@@ -12,7 +12,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 	{
 		[field: SerializeField]
 		public bool DebugMode { get; set; }
-		
+
 		[SerializeField]
 		private int chunkSize = 32;
 
@@ -84,31 +84,31 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private Vector3 lastPlayerPosition;
 
 		private int queueUpdateCount;
-		
+
 		private readonly List<Chunk> queuedChunkEdits = new();
 
 		private readonly Dictionary<OctreeNode, ChunkCreationQueueData> queuedOctreeNodes = new();
-		
+
 		private readonly Dictionary<OctreeNode, ChunkCreationQueueData> queuedOctreeNodesCheckTerrainMapCompletion = new();
-		
+
 		private readonly Dictionary<OctreeNode, ChunkCreationQueueData> queuedOctreeNodesCheckChunkJobCompletion = new();
-		
+
 		private readonly List<ChunkContainer> chunkContainers = new();
 
 		private readonly Dictionary<Vector3Int, Chunk> registeredChunks = new();
 
 		private readonly List<OctreeNode> rootNodes = new();
-		
+
 		private readonly List<ChunkContainer> chunksToBeDisabled = new();
-			
+
 		private readonly List<ChunkContainer> chunksToBeEnabled = new();
-		
+
 		private Vector3 CorePosition => transform.position;
 
 		private int terrainMapSize;
-		
+
 		public float trueWorldSize => worldSize * chunkSize;
-		
+
 		public List<OctreeNode> VisibleNodes { get; } = new();
 
 		private void Start()
@@ -123,7 +123,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			for (var y = CorePosition.y; y < CorePosition.y + trueWorldSize; y += nodeSize)
 			for (var z = CorePosition.z; z < CorePosition.z + trueWorldSize; z += nodeSize)
 				rootNodes.Add(new OctreeNode(new Vector3Int((int)x, (int)y, (int)z), nodeSize, chunkSize, this));
-			
+
 			var chunkSizeDoubled = chunkSize * 2;
 			terrainMapSize = chunkSizeDoubled * (chunkSizeDoubled * chunkSize);
 		}
@@ -164,13 +164,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				//RequestChunkEdit - if it rejects edit move to the back of list
 				queuedChunkEdits.RemoveAt(0);
 			}
-			
+
 			#region ChunkCreationQueue
 			queueUpdateCount++;
 			if (queueUpdateCount % queueUpdateFrequency == 0)
 			{
 				queueUpdateCount = 0;
-				
+
 				if (queueDequeueLimit > queuedOctreeNodesCheckTerrainMapCompletion.Count &&
 				    queuedOctreeNodes.Count > 0)
 				{
@@ -240,7 +240,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 							var octreeNode = chunkCreationQueueData.Key;
 							octreeNode.ChunkContainer.Chunk.LocalTerrainMap = creationQueueData.TerrainMapJob.terrainMap.ToArray();
-							
+
 							var meshDataJob = new MeshDataJob
 							{
 								chunkSize = chunkSize + 1,
@@ -257,14 +257,14 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 							creationQueueData.SetMeshDataJob(meshDataJob);
 							creationQueueData.SetMarkChunkJobHandle(meshDataJob.Schedule());
 							creationQueueData.TerrainMapJob.terrainMap.Dispose();
-							
+
 							JobHandle.ScheduleBatchedJobs();
 							queuedOctreeNodesCheckChunkJobCompletion.Add(octreeNode, creationQueueData);
-					
+
 							terrainMapNodeToRemove.Add(octreeNode);
 						}
 					}
-					
+
 					foreach (var octreeNode in terrainMapNodeToRemove)
 					{
 						queuedOctreeNodesCheckTerrainMapCompletion.Remove(octreeNode);
@@ -280,46 +280,47 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 						if (creationQueueData.MarkChunkJobHandle.IsCompleted)
 						{
 							creationQueueData.MarkChunkJobHandle.Complete();
-					
+
 							var octreeNode = chunkCreationQueueData.Key;
 							var chunkContainerChunk = octreeNode.ChunkContainer.Chunk;
 							var tCount = creationQueueData.MeshDataJob.triCount[0];
 							chunkContainerChunk.ChunkTriangles = new int[tCount];
+
+							var meshDataJob = creationQueueData.MeshDataJob;
+
 							for (var i = 0; i < tCount; i++)
 							{
-								var meshDataJob = creationQueueData.MeshDataJob;
 								chunkContainerChunk.ChunkTriangles[i] = meshDataJob.triangles[i];
 							}
-					
+
 							var vCount = creationQueueData.MeshDataJob.vertCount[0];
 							chunkContainerChunk.ChunkVertices = new Vector3[vCount];
 							for (var i = 0; i < vCount; i++)
 							{
-								var meshDataJob = creationQueueData.MeshDataJob;
 								chunkContainerChunk.ChunkVertices[i] = meshDataJob.vertices[i];
 							}
-					
+
 							chunkContainerChunk.BuildMesh();
-					
+
 							creationQueueData.MeshDataJob.vertices.Dispose();
 							creationQueueData.MeshDataJob.triangles.Dispose();
 							creationQueueData.MeshDataJob.cube.Dispose();
 							creationQueueData.MeshDataJob.triCount.Dispose();
 							creationQueueData.MeshDataJob.vertCount.Dispose();
 							creationQueueData.MeshDataJob.terrainMap.Dispose();
-					
+
 							octreeNode.ChunkContainer.CreateChunkMesh(coreMaterial);
 							octreeNode.IsQueued = false;
-					
+
 							if (octreeNode.IsDisabled)
 							{
 								octreeNode.ReturnChunk();
 							}
-					
+
 							chunkCreationNodeToRemove.Add(octreeNode);
 						}
 					}
-					
+
 					foreach (var octreeNode in chunkCreationNodeToRemove)
 					{
 						queuedOctreeNodesCheckChunkJobCompletion.Remove(octreeNode);
@@ -342,7 +343,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 				var lastVisibleNodes = VisibleNodes.ToList();
 				VisibleNodes.Clear();
-				
+
 				var trueViewDistance = viewDistance * chunkSize;
 				for (var x = playerPosition.x - trueViewDistance;
 				     x < playerPosition.x + trueViewDistance;
@@ -362,7 +363,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 						lastVisibleNodes.Remove(node);
 					}
 				}
-				
+
 				DisableNonVisbleNodes(lastVisibleNodes);
 			}
 		}
@@ -404,7 +405,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				if (chunkContainers[i].IsUsed) continue;
 				chunkContainers[i].AssignChunk(chunk);
 				chunkContainers[i].transform.position = position;
-				
+
 				if (chunk is { Hasdata: false })
 				{
 					queuedOctreeNodes.TryAdd(octreeNode, new ChunkCreationQueueData());
@@ -413,7 +414,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				{
 					chunkContainers[i].CreateChunkMesh(coreMaterial);
 				}
-				
+
 				chunksToBeEnabled.Add(chunkContainers[i]);
 				return chunkContainers[i];
 			}
@@ -423,7 +424,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			var requestedChunkContainer = chunkContainerObject.AddComponent<ChunkContainer>();
 			requestedChunkContainer.AssignChunk(chunk);
 			requestedChunkContainer.transform.position = position;
-			
+
 			if (chunk is { Hasdata: false })
 			{
 				queuedOctreeNodes.TryAdd(octreeNode, new ChunkCreationQueueData());
@@ -432,7 +433,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			{
 				requestedChunkContainer.CreateChunkMesh(coreMaterial);
 			}
-			
+
 			chunkContainers.Add(requestedChunkContainer);
 			chunksToBeEnabled.Add(requestedChunkContainer);
 			return requestedChunkContainer;
