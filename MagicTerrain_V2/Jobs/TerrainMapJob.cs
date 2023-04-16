@@ -95,19 +95,6 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2.Jobs
 				var t = 1f - Mathf.Exp(-0.3f * (distance - planetSize));
 				var value = Mathf.Lerp(caveNoiseValue > 0.47f ? caveNoiseValue : noiseValue, 1f, t);
 				terrainMap[index + chunkSize * (y + chunkSize * z)] = value;
-				
-				// var surfaceNoise = FastNoiseLite.GetNoise(
-				// 	xPos * 1.5f + 0.01f,
-				// 	zPos * 1.5f + 0.01f,
-				// 	seed,
-				// 	octaves,
-				// 	weightedStrength,
-				// 	lacunarity,
-				// 	gain);
-				// var distance = Vector3.Distance(new Vector3(xPos, yPos, zPos), new Vector3(xPos, 0, zPos));
-				// var t = 1f - Mathf.Exp(-0.3f * (distance - 50f));
-				// var value = Mathf.Lerp(surfaceNoise > 0.47f ? surfaceNoise : noiseValue, 1f, t);
-				// terrainMap[index + chunkSize * (y + chunkSize * z)] = value;
 			}
 		}
 	}

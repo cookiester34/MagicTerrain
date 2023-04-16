@@ -5,32 +5,28 @@ using Unity.Jobs;
 namespace SubModules.MagicTerrain.MagicTerrain_V2.Helpers
 {
 	[Serializable]
-	public class ChunkCreationQueueData
+	public struct ChunkTerrainMapJobData
 	{
-		public JobHandle TerrainMapJobHandle { get; set; }
-		public JobHandle MarkChunkJobHandle { get; set; }
-		public TerrainMapJob TerrainMapJob { get; set; }
-		public MeshDataJob MeshDataJob { get; set; }
+		public JobHandle TerrainMapJobHandle { get; }
+		public TerrainMapJob TerrainMapJob { get; }
 		
-
-		public void SetTerrainMapJob(TerrainMapJob terrainMapJob)
-		{
-			TerrainMapJob = terrainMapJob;
-		}
-		
-		public void SetTerrainMapJobHandle(JobHandle terrainMapJobHandle)
+		public ChunkTerrainMapJobData(JobHandle terrainMapJobHandle, TerrainMapJob terrainMapJob)
 		{
 			TerrainMapJobHandle = terrainMapJobHandle;
+			TerrainMapJob = terrainMapJob;
 		}
+	}
+	
+	[Serializable]
+	public struct ChunkMarchChunkJobData
+	{
+		public JobHandle MeshDataJobHandle { get; }
+		public MeshDataJob MeshDataJob { get; }
 		
-		public void SetMeshDataJob(MeshDataJob meshDataJob)
+		public ChunkMarchChunkJobData(JobHandle meshDataJobHandle, MeshDataJob meshDataJob)
 		{
+			MeshDataJobHandle = meshDataJobHandle;
 			MeshDataJob = meshDataJob;
-		}
-		
-		public void SetMarkChunkJobHandle(JobHandle markChunkJobHandle)
-		{
-			MarkChunkJobHandle = markChunkJobHandle;
 		}
 	}
 }

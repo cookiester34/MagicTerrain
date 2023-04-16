@@ -13,16 +13,18 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		[field:SerializeField]
 		public Chunk Chunk { get; private set; }
 
-		public bool IsUsed => Chunk != null;
+		public bool IsUsed { get; set; }
 
 		public void AssignChunk(Chunk newChunk)
 		{
 			Chunk = newChunk;
+			IsUsed = true;
 		}
 
 		public void UnAssignChunk()
 		{
 			Chunk = null;
+			IsUsed = false;
 			CheckContainerHasComponents();
 			meshFilter.sharedMesh = null;
 			// meshCollider.sharedMesh = null;
@@ -35,7 +37,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			CheckContainerHasComponents();
 			meshRenderer.material = material;
 			meshFilter.sharedMesh = Chunk.Meshes[0];
-			// meshCollider.sharedMesh = Chunk.Meshes[0];
+			meshCollider.sharedMesh = Chunk.Meshes[0];
 		}
 
 		private void CheckContainerHasComponents()

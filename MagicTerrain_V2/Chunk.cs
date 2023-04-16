@@ -1,21 +1,19 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 namespace SubModules.MagicTerrain.MagicTerrain_V2
 {
+	[Serializable]
 	public class Chunk
 	{
+		[field:SerializeField]
+		public float[] LocalTerrainMap { get;  set; }
+		
 		public int[] ChunkTriangles { get;  set; }
 		public Vector3[] ChunkVertices { get;  set; }
-		public float[] LocalTerrainMap { get;  set; }
-		public Vector3 Position { get; }
 		public Mesh[] Meshes { get; private set; }
 		public bool Hasdata => LocalTerrainMap != null;
-
-		public Chunk(Vector3 position)
-		{
-			Position = position;
-		}
-
+		
 		public void BuildMesh()
 		{
 			Meshes = new Mesh[1];

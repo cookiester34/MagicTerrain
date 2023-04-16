@@ -20,9 +20,6 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private float worldSize = 10;
 
 		[SerializeField]
-		private int rootNodeSize = 16;
-
-		[SerializeField]
 		private int viewDistance = 2;
 
 		[SerializeField]
@@ -30,6 +27,9 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		[SerializeField]
 		private Transform playerTransform;
+		
+		[SerializeField]
+		private Camera mainCamera;
 
 		[SerializeField]
 		private int chunkContainerStartPoolCount = 100;
@@ -87,45 +87,42 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		private readonly List<Chunk> queuedChunkEdits = new();
 
-		private readonly Dictionary<OctreeNode, ChunkCreationQueueData> queuedOctreeNodes = new();
+		private readonly Dictionary<Vector3, Node> nodes = new();
 
-		private readonly Dictionary<OctreeNode, ChunkCreationQueueData> queuedOctreeNodesCheckTerrainMapCompletion = new();
+		private readonly List<Node> queuedNodes = new();
 
-		private readonly Dictionary<OctreeNode, ChunkCreationQueueData> queuedOctreeNodesCheckChunkJobCompletion = new();
+		private readonly Dictionary<Node, ChunkTerrainMapJobData> queuedNodesCheckTerrainMapCompletion = new();
+
+		private readonly Dictionary<Node, ChunkMarchChunkJobData> queuedNodesCheckChunkJobCompletion = new();
 
 		private readonly List<ChunkContainer> chunkContainers = new();
 
 		private readonly Dictionary<Vector3Int, Chunk> registeredChunks = new();
 
-		private readonly List<OctreeNode> rootNodes = new();
-
-		private readonly List<ChunkContainer> chunksToBeDisabled = new();
-
-		private readonly List<ChunkContainer> chunksToBeEnabled = new();
-
 		private Vector3 CorePosition => transform.position;
 
 		private int terrainMapSize;
 
-		public float trueWorldSize => worldSize * chunkSize;
+		private float TrueWorldSize => worldSize * chunkSize;
 
-		public List<OctreeNode> VisibleNodes { get; } = new();
+		private HashSet<Vector3> visiblePositions { get; } = new();
 
 		private void Start()
 		{
 			lastPlayerPosition = playerTransform.position;
 
-			for (var i = 0; i < chunkContainerStartPoolCount; i++) RequestChunkContainer(Vector3.zero, null, null);
-
-			// Create the root nodes of the octree system
-			var nodeSize = chunkSize * rootNodeSize;
-			for (var x = CorePosition.x; x < CorePosition.x + trueWorldSize; x += nodeSize)
-			for (var y = CorePosition.y; y < CorePosition.y + trueWorldSize; y += nodeSize)
-			for (var z = CorePosition.z; z < CorePosition.z + trueWorldSize; z += nodeSize)
-				rootNodes.Add(new OctreeNode(new Vector3Int((int)x, (int)y, (int)z), nodeSize, chunkSize, this));
-
+			for (var i = 0; i < chunkContainerStartPoolCount; i++)
+			{
+				var chunkContainerObject = new GameObject("ChunkContainer");
+				chunkContainerObject.transform.SetParent(transform);
+				var requestedChunkContainer = chunkContainerObject.AddComponent<ChunkContainer>();
+				requestedChunkContainer.transform.position = Vector3.zero;
+				chunkContainers.Add(requestedChunkContainer);
+				requestedChunkContainer.gameObject.SetActive(false);
+			}
+			
 			var chunkSizeDoubled = chunkSize * 2;
-			terrainMapSize = chunkSizeDoubled * (chunkSizeDoubled * chunkSize);
+			terrainMapSize = chunkSizeDoubled * chunkSizeDoubled * chunkSize;
 		}
 
 		private void Update()
@@ -133,28 +130,11 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			ManageQueues();
 
 			CalculateVisibleNodes();
-
-
-			for (var i = 0; i < 10; i++)
-			{
-				if (chunksToBeDisabled.Count <= 0) continue;
-				chunksToBeDisabled[0].gameObject.SetActive(false);
-				chunksToBeDisabled.RemoveAt(0);
-			}
-
-			for (var i = 0; i < 10; i++)
-			{
-				if (chunksToBeEnabled.Count <= 0) continue;
-				chunksToBeEnabled[0].gameObject.SetActive(true);
-				chunksToBeEnabled.RemoveAt(0);
-			}
 		}
 
 		private void OnDrawGizmos()
 		{
 			if (!DebugMode) return;
-			// Draw the octree nodes in the Unity editor
-			foreach (var rootNode in rootNodes) rootNode?.DrawGizmos();
 		}
 
 		private void ManageQueues()
@@ -166,226 +146,209 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			}
 
 			#region ChunkCreationQueue
+
 			queueUpdateCount++;
-			if (queueUpdateCount % queueUpdateFrequency == 0)
+			if (queueUpdateCount % queueUpdateFrequency != 0) return;
+
+			queueUpdateCount = 0;
+
+			var playerPosition = playerTransform.position;
+			if (queueDequeueLimit > queuedNodesCheckTerrainMapCompletion.Count &&
+			    queuedNodes.Count > 0)
 			{
-				queueUpdateCount = 0;
+				var orderedEnumerable = queuedNodes.OrderBy(node =>
+						Vector3.Distance(node.Position, playerPosition));
 
-				if (queueDequeueLimit > queuedOctreeNodesCheckTerrainMapCompletion.Count &&
-				    queuedOctreeNodes.Count > 0)
+				foreach (var node in orderedEnumerable)
 				{
-					var playerPosition = playerTransform.position;
-					var orderedEnumerable =
-						queuedOctreeNodes.OrderBy(keyValuePair =>
-							Vector3.Distance(keyValuePair.Key.Position, playerPosition));
+					if (queueDequeueLimit <= queuedNodesCheckTerrainMapCompletion.Count) break;
 
-					foreach (var keyValuePair in orderedEnumerable)
+					if (node.ChunkContainer != null && node.ChunkContainer.Chunk != null)
 					{
-						if (queueDequeueLimit <= queuedOctreeNodesCheckTerrainMapCompletion.Count) break;
-
-						var octreeNode = keyValuePair.Key;
-
-						if (octreeNode?.ChunkContainer != null && octreeNode.ChunkContainer.Chunk != null)
-						{
-							octreeNode.IsQueued = true;
-						}
-						else
-						{
-							continue;
-						}
-
-						if (octreeNode.IsLoaded)
-						{
-							//Schedule chunk jobs
-							var terrainMapJob = new TerrainMapJob
-							{
-								chunkSize = chunkSize + 1,
-								chunkPosition = octreeNode.Position,
-								planetCenter = CorePosition,
-								planetSize = trueWorldSize,
-								octaves = octaves,
-								weightedStrength = weightedStrength,
-								lacunarity = lacunarity,
-								gain = gain,
-								octavesCaves = octavesCaves,
-								weightedStrengthCaves = weightedStrengthCaves,
-								lacunarityCaves = lacunarityCaves,
-								gainCaves = gainCaves,
-								domainWarpAmp = domainWarpAmp,
-								terrainMap = new NativeArray<float>(terrainMapSize, Allocator.Persistent),
-								seed = seed
-							};
-							keyValuePair.Value.SetTerrainMapJob(terrainMapJob);
-							keyValuePair.Value.SetTerrainMapJobHandle(terrainMapJob.Schedule(chunkSize + 1, 200));
-								;
-							JobHandle.ScheduleBatchedJobs();
-
-							queuedOctreeNodesCheckTerrainMapCompletion.Add(octreeNode, keyValuePair.Value);
-						}
-
-						//when chunk is done remove from queue
-						queuedOctreeNodes.Remove(octreeNode);
+						node.IsQueued = true;
 					}
+					else
+					{
+						continue;
+					}
+
+					if (node.IsLoaded)
+					{
+						var terrainMapJob = new TerrainMapJob
+						{
+							chunkSize = chunkSize + 1,
+							chunkPosition = node.Position,
+							planetCenter = CorePosition,
+							planetSize = TrueWorldSize,
+							octaves = octaves,
+							weightedStrength = weightedStrength,
+							lacunarity = lacunarity,
+							gain = gain,
+							octavesCaves = octavesCaves,
+							weightedStrengthCaves = weightedStrengthCaves,
+							lacunarityCaves = lacunarityCaves,
+							gainCaves = gainCaves,
+							domainWarpAmp = domainWarpAmp,
+							terrainMap = new NativeArray<float>(terrainMapSize, Allocator.Persistent),
+							seed = seed
+						};
+						var terrainMapJobHandle = terrainMapJob.Schedule(chunkSize + 1, 200);
+						JobHandle.ScheduleBatchedJobs();
+
+						//TODO: Create a better way to handle this
+						queuedNodesCheckTerrainMapCompletion.TryAdd(node,
+							new ChunkTerrainMapJobData(terrainMapJobHandle, terrainMapJob));
+					}
+
+					//when chunk is done remove from queue
+					queuedNodes.Remove(node);
+				}
+			}
+
+			if (queuedNodesCheckTerrainMapCompletion.Count > 0)
+			{
+				List<Node> terrainMapNodeToRemove = new();
+				foreach (var (node, creationQueueData) in queuedNodesCheckTerrainMapCompletion)
+				{
+					if (!creationQueueData.TerrainMapJobHandle.IsCompleted) continue;
+
+					creationQueueData.TerrainMapJobHandle.Complete();
+
+					node.ChunkContainer.Chunk.LocalTerrainMap =
+						creationQueueData.TerrainMapJob.terrainMap.ToArray();
+
+					var meshDataJob = new MeshDataJob
+					{
+						chunkSize = chunkSize + 1,
+						terrainMap = new NativeArray<float>(node.ChunkContainer.Chunk.LocalTerrainMap,
+							Allocator.Persistent),
+						terrainSurface = 0.5f,
+						vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
+						triangles = new NativeArray<int>(900000, Allocator.Persistent),
+						cube = new NativeArray<float>(8, Allocator.Persistent),
+						smoothTerrain = smoothTerrain,
+						flatShaded = !smoothTerrain || flatShaded,
+						triCount = new NativeArray<int>(1, Allocator.Persistent),
+						vertCount = new NativeArray<int>(1, Allocator.Persistent)
+					};
+					var meshDataJobHandle = meshDataJob.Schedule();
+					creationQueueData.TerrainMapJob.terrainMap.Dispose();
+
+					JobHandle.ScheduleBatchedJobs();
+					queuedNodesCheckChunkJobCompletion.Add(node,
+						new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
+
+					terrainMapNodeToRemove.Add(node);
 				}
 
-				if (queuedOctreeNodesCheckTerrainMapCompletion.Count > 0)
+				foreach (var node in terrainMapNodeToRemove)
 				{
-					List<OctreeNode> terrainMapNodeToRemove = new();
-					foreach (var chunkCreationQueueData in queuedOctreeNodesCheckTerrainMapCompletion)
-					{
-						var creationQueueData = chunkCreationQueueData.Value;
-						if (creationQueueData.TerrainMapJobHandle.IsCompleted)
-						{
-							creationQueueData.TerrainMapJobHandle.Complete();
+					queuedNodesCheckTerrainMapCompletion.Remove(node);
+				}
+			}
 
-							var octreeNode = chunkCreationQueueData.Key;
-							octreeNode.ChunkContainer.Chunk.LocalTerrainMap = creationQueueData.TerrainMapJob.terrainMap.ToArray();
+			if (queuedNodesCheckChunkJobCompletion.Count <= 0) return;
 
-							var meshDataJob = new MeshDataJob
-							{
-								chunkSize = chunkSize + 1,
-								terrainMap = new NativeArray<float>(octreeNode.ChunkContainer.Chunk.LocalTerrainMap, Allocator.Persistent),
-								terrainSurface = 0.5f,
-								vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
-								triangles = new NativeArray<int>(900000, Allocator.Persistent),
-								cube = new NativeArray<float>(8, Allocator.Persistent),
-								smoothTerrain = smoothTerrain,
-								flatShaded = !smoothTerrain || flatShaded,
-								triCount = new NativeArray<int>(1, Allocator.Persistent),
-								vertCount = new NativeArray<int>(1, Allocator.Persistent)
-							};
-							creationQueueData.SetMeshDataJob(meshDataJob);
-							creationQueueData.SetMarkChunkJobHandle(meshDataJob.Schedule());
-							creationQueueData.TerrainMapJob.terrainMap.Dispose();
+			List<Node> chunkCreationNodeToRemove = new();
+			foreach (var (node, creationQueueData) in queuedNodesCheckChunkJobCompletion)
+			{
+				if (!creationQueueData.MeshDataJobHandle.IsCompleted) continue;
 
-							JobHandle.ScheduleBatchedJobs();
-							queuedOctreeNodesCheckChunkJobCompletion.Add(octreeNode, creationQueueData);
+				creationQueueData.MeshDataJobHandle.Complete();
 
-							terrainMapNodeToRemove.Add(octreeNode);
-						}
-					}
+				var chunkContainerChunk = node.ChunkContainer.Chunk;
+				var tCount = creationQueueData.MeshDataJob.triCount[0];
+				chunkContainerChunk.ChunkTriangles = new int[tCount];
 
-					foreach (var octreeNode in terrainMapNodeToRemove)
-					{
-						queuedOctreeNodesCheckTerrainMapCompletion.Remove(octreeNode);
-					}
+				var meshDataJob = creationQueueData.MeshDataJob;
+
+				for (var i = 0; i < tCount; i++)
+				{
+					chunkContainerChunk.ChunkTriangles[i] = meshDataJob.triangles[i];
 				}
 
-				if (queuedOctreeNodesCheckChunkJobCompletion.Count > 0)
+				var vCount = creationQueueData.MeshDataJob.vertCount[0];
+				chunkContainerChunk.ChunkVertices = new Vector3[vCount];
+				for (var i = 0; i < vCount; i++)
 				{
-					List<OctreeNode> chunkCreationNodeToRemove = new();
-					foreach (var chunkCreationQueueData in queuedOctreeNodesCheckChunkJobCompletion)
-					{
-						var creationQueueData = chunkCreationQueueData.Value;
-						if (creationQueueData.MarkChunkJobHandle.IsCompleted)
-						{
-							creationQueueData.MarkChunkJobHandle.Complete();
-
-							var octreeNode = chunkCreationQueueData.Key;
-							var chunkContainerChunk = octreeNode.ChunkContainer.Chunk;
-							var tCount = creationQueueData.MeshDataJob.triCount[0];
-							chunkContainerChunk.ChunkTriangles = new int[tCount];
-
-							var meshDataJob = creationQueueData.MeshDataJob;
-
-							for (var i = 0; i < tCount; i++)
-							{
-								chunkContainerChunk.ChunkTriangles[i] = meshDataJob.triangles[i];
-							}
-
-							var vCount = creationQueueData.MeshDataJob.vertCount[0];
-							chunkContainerChunk.ChunkVertices = new Vector3[vCount];
-							for (var i = 0; i < vCount; i++)
-							{
-								chunkContainerChunk.ChunkVertices[i] = meshDataJob.vertices[i];
-							}
-
-							chunkContainerChunk.BuildMesh();
-
-							creationQueueData.MeshDataJob.vertices.Dispose();
-							creationQueueData.MeshDataJob.triangles.Dispose();
-							creationQueueData.MeshDataJob.cube.Dispose();
-							creationQueueData.MeshDataJob.triCount.Dispose();
-							creationQueueData.MeshDataJob.vertCount.Dispose();
-							creationQueueData.MeshDataJob.terrainMap.Dispose();
-
-							octreeNode.ChunkContainer.CreateChunkMesh(coreMaterial);
-							octreeNode.IsQueued = false;
-
-							if (octreeNode.IsDisabled)
-							{
-								octreeNode.ReturnChunk();
-							}
-
-							chunkCreationNodeToRemove.Add(octreeNode);
-						}
-					}
-
-					foreach (var octreeNode in chunkCreationNodeToRemove)
-					{
-						queuedOctreeNodesCheckChunkJobCompletion.Remove(octreeNode);
-					}
+					chunkContainerChunk.ChunkVertices[i] = meshDataJob.vertices[i];
 				}
+
+				chunkContainerChunk.BuildMesh();
+
+				creationQueueData.MeshDataJob.vertices.Dispose();
+				creationQueueData.MeshDataJob.triangles.Dispose();
+				creationQueueData.MeshDataJob.cube.Dispose();
+				creationQueueData.MeshDataJob.triCount.Dispose();
+				creationQueueData.MeshDataJob.vertCount.Dispose();
+				creationQueueData.MeshDataJob.terrainMap.Dispose();
+
+				node.ChunkContainer.CreateChunkMesh(coreMaterial);
+				node.IsQueued = false;
+
+				if (node.IsDisabled)
+				{
+					node.ReturnChunk();
+				}
+
+				chunkCreationNodeToRemove.Add(node);
+			}
+
+			foreach (var octreeNode in chunkCreationNodeToRemove)
+			{
+				queuedNodesCheckChunkJobCompletion.Remove(octreeNode);
 			}
 			#endregion
 		}
 
 		private void CalculateVisibleNodes()
 		{
-			var playerPosition = playerTransform.position;
+			// if (mainCamera == null)
+			// {
+			// 	Debug.LogError("Cannot Calculate Visible Nodes without a camera");
+			// 	var planes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
+			// 	return;
+			// }
+			
+			var playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(playerTransform.position);
+			var playerPosition = new Vector3Int(
+				Mathf.RoundToInt(playerLastPositionRelative.x).RoundOff(chunkSize),
+				Mathf.RoundToInt(playerLastPositionRelative.y).RoundOff(chunkSize),
+				Mathf.RoundToInt(playerLastPositionRelative.z).RoundOff(chunkSize));
+			
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
-			if (distance >= updateDistance || forceUpdate)
+			if (!(distance >= updateDistance) && !forceUpdate) return;
+			
+			lastPlayerPosition = playerPosition;
+			forceUpdate = false;
+
+			var lastVisibleNodes = visiblePositions.ToList();
+			visiblePositions.Clear();
+
+			var trueViewDistance = viewDistance * chunkSize;
+			
+			for (var x = playerPosition.x - trueViewDistance; x < playerPosition.x + trueViewDistance; x += chunkSize)
+			for (var y = playerPosition.y - trueViewDistance; y < playerPosition.y + trueViewDistance; y += chunkSize)
+			for (var z = playerPosition.z - trueViewDistance; z < playerPosition.z + trueViewDistance; z += chunkSize)
 			{
-				lastPlayerPosition = playerPosition;
-				forceUpdate = false;
-
-				MarkAllNonVisible();
-
-				var lastVisibleNodes = VisibleNodes.ToList();
-				VisibleNodes.Clear();
-
-				var trueViewDistance = viewDistance * chunkSize;
-				for (var x = playerPosition.x - trueViewDistance;
-				     x < playerPosition.x + trueViewDistance;
-				     x += chunkSize)
-				for (var y = playerPosition.y - trueViewDistance;
-				     y < playerPosition.y + trueViewDistance;
-				     y += chunkSize)
-				for (var z = playerPosition.z - trueViewDistance;
-				     z < playerPosition.z + trueViewDistance;
-				     z += chunkSize)
-					EnableVisibleNodes(new Vector3(x, y, z));
-
-				foreach (var node in VisibleNodes)
+				var position = new Vector3(x,y,z);
+				if (!nodes.ContainsKey(position))
 				{
-					if (lastVisibleNodes.Contains(node))
-					{
-						lastVisibleNodes.Remove(node);
-					}
+					var chunkPosition = new Vector3Int(x,y,z);
+					nodes.Add(position, new Node(chunkPosition, chunkSize, RequestChunk(chunkPosition), this));
 				}
-
-				DisableNonVisbleNodes(lastVisibleNodes);
+				visiblePositions.Add(position);
 			}
-		}
-
-		private void MarkAllNonVisible()
-		{
-			foreach (var node in VisibleNodes) node.SetNotVisible();
-		}
-
-		private void EnableVisibleNodes(Vector3 position)
-		{
-			// Calculate which nodes are visible and which are not
-			// This is where the magic happens
-
-			foreach (var rootNode in rootNodes) rootNode.EnableVisibleNodes(position);
-		}
-
-		private void DisableNonVisbleNodes(List<OctreeNode> lastVisibleNodes)
-		{
-			foreach (var node in lastVisibleNodes)
+			
+			foreach (var position in lastVisibleNodes)
 			{
-				node.DisableNonVisibleNodes();
+				if (visiblePositions.Contains(position)) continue;
+				nodes[position].Disable();
+			}
+
+			foreach (var nodePosition in visiblePositions)
+			{
+				nodes[nodePosition].EnableNode();
 			}
 		}
 
@@ -393,30 +356,36 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		{
 			if (registeredChunks.TryGetValue(position, out var foundChunk)) return foundChunk;
 
-			var requestedChunk = new Chunk(position);
+			var requestedChunk = new Chunk();
 			registeredChunks.Add(position, requestedChunk);
 			return requestedChunk;
 		}
 
-		public ChunkContainer RequestChunkContainer(Vector3 position, OctreeNode octreeNode, Chunk chunk)
+		public ChunkContainer RequestChunkContainer(Vector3 position, Node node, Chunk chunk)
 		{
-			for (var i = 0; i < chunkContainers.Count; i++)
+			ChunkContainer foundContainer = null;
+			foreach (var chunkContainer in chunkContainers)
 			{
-				if (chunkContainers[i].IsUsed) continue;
-				chunkContainers[i].AssignChunk(chunk);
-				chunkContainers[i].transform.position = position;
+				if (chunkContainer.IsUsed) continue;
+				foundContainer = chunkContainer;
+			}
+			
+			if (foundContainer != null)
+			{
+				foundContainer.AssignChunk(chunk);
+				foundContainer.transform.position = position;
 
 				if (chunk is { Hasdata: false })
 				{
-					queuedOctreeNodes.TryAdd(octreeNode, new ChunkCreationQueueData());
+					queuedNodes.Add(node);
 				}
 				else if (chunk != null)
 				{
-					chunkContainers[i].CreateChunkMesh(coreMaterial);
+					foundContainer.CreateChunkMesh(coreMaterial);
 				}
 
-				chunksToBeEnabled.Add(chunkContainers[i]);
-				return chunkContainers[i];
+				foundContainer.gameObject.SetActive(true);
+				return foundContainer;
 			}
 
 			var chunkContainerObject = new GameObject("ChunkContainer");
@@ -427,7 +396,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 			if (chunk is { Hasdata: false })
 			{
-				queuedOctreeNodes.TryAdd(octreeNode, new ChunkCreationQueueData());
+				queuedNodes.Add(node);
 			}
 			else if (chunk != null)
 			{
@@ -435,40 +404,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			}
 
 			chunkContainers.Add(requestedChunkContainer);
-			chunksToBeEnabled.Add(requestedChunkContainer);
+			requestedChunkContainer.gameObject.SetActive(true);
 			return requestedChunkContainer;
-		}
-
-		private void AddChunk(Vector3 position)
-		{
-			// Find the appropriate octree node for the chunk and add it to that node
-			foreach (var node in rootNodes.Select(rootNode => rootNode.FindNode(position))
-				         .Where(node => node is
-				         {
-					         IsChunkNode: true
-				         }))
-			{
-				node.RequestChunk();
-				return;
-			}
-		}
-
-		private void RemoveChunk(Vector3 position)
-		{
-			// Find the appropriate octree node for the chunk and remove it from that node
-			OctreeNode node;
-			foreach (var rootNode in rootNodes)
-			{
-				node = rootNode.FindNode(position);
-				if (node is not { IsChunkNode: true }) continue;
-				node.ReturnChunk();
-				return;
-			}
 		}
 
 		public void ReturnChunkContainer(ChunkContainer chunkContainer)
 		{
-			chunksToBeDisabled.Add(chunkContainer);
+			chunkContainer.gameObject.SetActive(false);
 			chunkContainer.UnAssignChunk();
 		}
 	}
