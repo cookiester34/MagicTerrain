@@ -84,9 +84,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private Vector3 lastPlayerPosition;
 
 		private int queueUpdateCount;
-
-		private readonly List<Chunk> queuedChunkEdits = new();
-
+		
 		private readonly Dictionary<Vector3, Node> nodes = new();
 
 		private readonly List<Node> queuedNodes = new();
@@ -94,6 +92,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private readonly Dictionary<Node, ChunkTerrainMapJobData> queuedNodesCheckTerrainMapCompletion = new();
 
 		private readonly Dictionary<Node, ChunkMarchChunkJobData> queuedNodesCheckChunkJobCompletion = new();
+		
+		private readonly Dictionary<Node, ChunkEditJobData> queuedNodesCirclePoints = new();
+		
+		private readonly Dictionary<Node, EditTerrainMapJobData> queuedNodesTerrainMapEdit = new();
 
 		private readonly List<ChunkContainer> chunkContainers = new();
 
@@ -116,6 +118,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				var chunkContainerObject = new GameObject("ChunkContainer");
 				chunkContainerObject.transform.SetParent(transform);
 				var requestedChunkContainer = chunkContainerObject.AddComponent<ChunkContainer>();
+				requestedChunkContainer.ChunkCore = this;
 				requestedChunkContainer.transform.position = Vector3.zero;
 				chunkContainers.Add(requestedChunkContainer);
 				requestedChunkContainer.gameObject.SetActive(false);
@@ -139,83 +142,92 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		private void ManageQueues()
 		{
-			for (var i = 0; i < queuedChunkEdits.Count; i++)
-			{
-				//RequestChunkEdit - if it rejects edit move to the back of list
-				queuedChunkEdits.RemoveAt(0);
-			}
+			ChecKGetCirclePointJobsQueue();
+			
+			CheckEditTerrainMapJobsQueue();
 
 			#region ChunkCreationQueue
-
+			
 			queueUpdateCount++;
 			if (queueUpdateCount % queueUpdateFrequency != 0) return;
-
 			queueUpdateCount = 0;
 
-			var playerPosition = playerTransform.position;
-			if (queueDequeueLimit > queuedNodesCheckTerrainMapCompletion.Count &&
-			    queuedNodes.Count > 0)
+			SchedualTerrainMapJobsQueue();
+
+			SchedualMeshCreationJobsQueue();
+
+			CheckMeshCreationJobQueue();
+
+			#endregion
+		}
+
+		private void ChecKGetCirclePointJobsQueue()
+		{
+			if (queuedNodesCirclePoints.Count <= 0) return;
+
+			List<Node> circleNodeToRemove = new();
+			foreach (var (node, chunkEditJobData) in queuedNodesCirclePoints)
 			{
-				var orderedEnumerable = queuedNodes.OrderBy(node =>
-						Vector3.Distance(node.Position, playerPosition));
-
-				foreach (var node in orderedEnumerable)
+				if (!chunkEditJobData.GetCirclePointsJobHandle.IsCompleted) continue;
+				
+				chunkEditJobData.GetCirclePointsJobHandle.Complete();
+				
+				var neighbourChunks = GetNeighbourChunks(node.Position);
+				bool isNeighbourChunkAlreadyQueued = false;
+				foreach (var neighbourChunk in neighbourChunks)
 				{
-					if (queueDequeueLimit <= queuedNodesCheckTerrainMapCompletion.Count) break;
-
-					if (node.ChunkContainer != null && node.ChunkContainer.Chunk != null)
+					if (queuedNodesTerrainMapEdit.ContainsKey(neighbourChunk))
 					{
-						node.IsQueued = true;
+						isNeighbourChunkAlreadyQueued = true;
+						break;
 					}
-					else
+				}
+				if (isNeighbourChunkAlreadyQueued)
+				{
+					circleNodeToRemove.Add(node);
+					continue;
+				}
+				
+				foreach (var neighbourNode in neighbourChunks)
+				{
+					var diferenceInPosition = node.Position - neighbourNode.Position;
+					var editedNodePointValues = chunkEditJobData.GetCirclePointsJob.points;
+					var terrainMapEditJob = new EditTerrainMapJob()
 					{
-						continue;
-					}
-
-					if (node.IsLoaded)
-					{
-						var terrainMapJob = new TerrainMapJob
-						{
-							chunkSize = chunkSize + 1,
-							chunkPosition = node.Position,
-							planetCenter = CorePosition,
-							planetSize = TrueWorldSize,
-							octaves = octaves,
-							weightedStrength = weightedStrength,
-							lacunarity = lacunarity,
-							gain = gain,
-							octavesCaves = octavesCaves,
-							weightedStrengthCaves = weightedStrengthCaves,
-							lacunarityCaves = lacunarityCaves,
-							gainCaves = gainCaves,
-							domainWarpAmp = domainWarpAmp,
-							terrainMap = new NativeArray<float>(terrainMapSize, Allocator.Persistent),
-							seed = seed
-						};
-						var terrainMapJobHandle = terrainMapJob.Schedule(chunkSize + 1, 200);
-						JobHandle.ScheduleBatchedJobs();
-
-						//TODO: Create a better way to handle this
-						queuedNodesCheckTerrainMapCompletion.TryAdd(node,
-							new ChunkTerrainMapJobData(terrainMapJobHandle, terrainMapJob));
-					}
-
-					//when chunk is done remove from queue
-					queuedNodes.Remove(node);
+						diferenceInPosition = diferenceInPosition,
+						points = editedNodePointValues,
+						add = chunkEditJobData.Add,
+						chunkSize = chunkSize,
+						terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap, Allocator.Persistent),
+						wasEdited = new NativeArray<bool>(1, Allocator.Persistent)
+					};
+					var jobHandler = terrainMapEditJob.Schedule(editedNodePointValues.Length, 60);
+					queuedNodesTerrainMapEdit.Add(neighbourNode, new EditTerrainMapJobData(jobHandler, terrainMapEditJob));
+					neighbourNode.IsProccessing = true;
 				}
 			}
 
-			if (queuedNodesCheckTerrainMapCompletion.Count > 0)
+			foreach (var node in circleNodeToRemove)
 			{
-				List<Node> terrainMapNodeToRemove = new();
-				foreach (var (node, creationQueueData) in queuedNodesCheckTerrainMapCompletion)
+				queuedNodesCirclePoints.Remove(node);
+			}
+		}
+
+		private void CheckEditTerrainMapJobsQueue()
+		{
+			if (queuedNodesTerrainMapEdit.Count <= 0) return;
+			
+			List<Node> terrainMapNodeToRemove = new();
+			foreach (var (node, editTerrainMapJobData) in queuedNodesTerrainMapEdit)
+			{
+				if (!editTerrainMapJobData.EditTerrainMapJobHandle.IsCompleted) continue;
+				
+				editTerrainMapJobData.EditTerrainMapJobHandle.Complete();
+				
+				var wasEdited = editTerrainMapJobData.EditTerrainMapJob.wasEdited[0];
+				if (wasEdited)
 				{
-					if (!creationQueueData.TerrainMapJobHandle.IsCompleted) continue;
-
-					creationQueueData.TerrainMapJobHandle.Complete();
-
-					node.ChunkContainer.Chunk.LocalTerrainMap =
-						creationQueueData.TerrainMapJob.terrainMap.ToArray();
+					node.Chunk.LocalTerrainMap = editTerrainMapJobData.EditTerrainMapJob.terrainMap.ToArray();
 
 					var meshDataJob = new MeshDataJob
 					{
@@ -232,23 +244,125 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 						vertCount = new NativeArray<int>(1, Allocator.Persistent)
 					};
 					var meshDataJobHandle = meshDataJob.Schedule();
-					creationQueueData.TerrainMapJob.terrainMap.Dispose();
 
 					JobHandle.ScheduleBatchedJobs();
-					queuedNodesCheckChunkJobCompletion.Add(node,
-						new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
-
-					terrainMapNodeToRemove.Add(node);
+					queuedNodesCheckChunkJobCompletion.Add(node, new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
 				}
-
-				foreach (var node in terrainMapNodeToRemove)
-				{
-					queuedNodesCheckTerrainMapCompletion.Remove(node);
-				}
+				
+				editTerrainMapJobData.EditTerrainMapJob.wasEdited.Dispose();
+				editTerrainMapJobData.EditTerrainMapJob.terrainMap.Dispose();
+				
+				terrainMapNodeToRemove.Add(node);
 			}
 
-			if (queuedNodesCheckChunkJobCompletion.Count <= 0) return;
+			foreach (var node in terrainMapNodeToRemove)
+			{
+				queuedNodesTerrainMapEdit.Remove(node);
+			}
+		}
 
+		private void SchedualTerrainMapJobsQueue()
+		{
+			
+			var playerPosition = playerTransform.position;
+			if (queueDequeueLimit <= queuedNodesCheckTerrainMapCompletion.Count || queuedNodes.Count <= 0) return;
+			
+			var orderedEnumerable = queuedNodes.OrderBy(node =>
+				Vector3.Distance(node.Position, playerPosition));
+
+			foreach (var node in orderedEnumerable)
+			{
+				if (queueDequeueLimit <= queuedNodesCheckTerrainMapCompletion.Count) break;
+
+				if (node.ChunkContainer != null && node.ChunkContainer.Chunk != null)
+				{
+					node.IsQueued = true;
+				}
+				else
+				{
+					continue;
+				}
+
+				if (node.IsLoaded)
+				{
+					var terrainMapJob = new TerrainMapJob
+					{
+						chunkSize = chunkSize + 1,
+						chunkPosition = node.Position,
+						planetCenter = CorePosition,
+						planetSize = TrueWorldSize,
+						octaves = octaves,
+						weightedStrength = weightedStrength,
+						lacunarity = lacunarity,
+						gain = gain,
+						octavesCaves = octavesCaves,
+						weightedStrengthCaves = weightedStrengthCaves,
+						lacunarityCaves = lacunarityCaves,
+						gainCaves = gainCaves,
+						domainWarpAmp = domainWarpAmp,
+						terrainMap = new NativeArray<float>(terrainMapSize, Allocator.Persistent),
+						seed = seed
+					};
+					var terrainMapJobHandle = terrainMapJob.Schedule(chunkSize + 1, 200);
+					JobHandle.ScheduleBatchedJobs();
+
+					//TODO: Create a better way to handle this
+					queuedNodesCheckTerrainMapCompletion.TryAdd(node,
+						new ChunkTerrainMapJobData(terrainMapJobHandle, terrainMapJob));
+				}
+
+				//when chunk is done remove from queue
+				queuedNodes.Remove(node);
+			}
+		}
+
+		private void SchedualMeshCreationJobsQueue()
+		{
+			if (queuedNodesCheckTerrainMapCompletion.Count <= 0) return;
+			
+			List<Node> terrainMapNodeToRemove = new();
+			foreach (var (node, creationQueueData) in queuedNodesCheckTerrainMapCompletion)
+			{
+				if (!creationQueueData.TerrainMapJobHandle.IsCompleted) continue;
+
+				creationQueueData.TerrainMapJobHandle.Complete();
+
+				node.Chunk.LocalTerrainMap = creationQueueData.TerrainMapJob.terrainMap.ToArray();
+
+				var meshDataJob = new MeshDataJob
+				{
+					chunkSize = chunkSize + 1,
+					terrainMap = new NativeArray<float>(node.ChunkContainer.Chunk.LocalTerrainMap,
+						Allocator.Persistent),
+					terrainSurface = 0.5f,
+					vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
+					triangles = new NativeArray<int>(900000, Allocator.Persistent),
+					cube = new NativeArray<float>(8, Allocator.Persistent),
+					smoothTerrain = smoothTerrain,
+					flatShaded = !smoothTerrain || flatShaded,
+					triCount = new NativeArray<int>(1, Allocator.Persistent),
+					vertCount = new NativeArray<int>(1, Allocator.Persistent)
+				};
+				var meshDataJobHandle = meshDataJob.Schedule();
+				creationQueueData.TerrainMapJob.terrainMap.Dispose();
+
+				JobHandle.ScheduleBatchedJobs();
+				queuedNodesCheckChunkJobCompletion.Add(node,
+					new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
+
+				terrainMapNodeToRemove.Add(node);
+			}
+
+			foreach (var node in terrainMapNodeToRemove)
+			{
+				queuedNodesCheckTerrainMapCompletion.Remove(node);
+			}
+		}
+
+		private void CheckMeshCreationJobQueue()
+		{
+			if (queuedNodesCheckChunkJobCompletion.Count <= 0) return;
+			
 			List<Node> chunkCreationNodeToRemove = new();
 			foreach (var (node, creationQueueData) in queuedNodesCheckChunkJobCompletion)
 			{
@@ -298,7 +412,6 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			{
 				queuedNodesCheckChunkJobCompletion.Remove(octreeNode);
 			}
-			#endregion
 		}
 
 		private void CalculateVisibleNodes()
@@ -352,7 +465,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			}
 		}
 
-		public Chunk RequestChunk(Vector3Int position)
+		private Chunk RequestChunk(Vector3Int position)
 		{
 			if (registeredChunks.TryGetValue(position, out var foundChunk)) return foundChunk;
 
@@ -391,6 +504,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			var chunkContainerObject = new GameObject("ChunkContainer");
 			chunkContainerObject.transform.SetParent(transform);
 			var requestedChunkContainer = chunkContainerObject.AddComponent<ChunkContainer>();
+			requestedChunkContainer.ChunkCore = this;
 			requestedChunkContainer.AssignChunk(chunk);
 			requestedChunkContainer.transform.position = position;
 
@@ -412,6 +526,61 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		{
 			chunkContainer.gameObject.SetActive(false);
 			chunkContainer.UnAssignChunk();
+		}
+		
+		public void EditNode(Node node, Vector3 hitPoint, float radius, bool add)
+		{
+			var neighbourNodes = GetNeighbourChunks(node.Position);
+
+			if (neighbourNodes.Any(x => x.IsProccessing)) return;
+			
+			if (queuedNodesCirclePoints.ContainsKey(node))
+			{
+				Debug.LogError("Failed to add chunk to edit queue, cancelling edit");
+				return;
+			}
+			
+			node.IsProccessing = true;
+			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
+			var arraySize = ceilToInt * ceilToInt * ceilToInt;
+
+			var getCirclePointsJob = GetCirclePointJobs(hitPoint, arraySize, radius, add);
+			var jobHandle = getCirclePointsJob.Schedule();
+			queuedNodesCirclePoints.Add(node, new ChunkEditJobData(jobHandle, getCirclePointsJob, add));
+
+			JobHandle.ScheduleBatchedJobs();
+		}
+
+		private IEnumerable<Node> GetNeighbourChunks(Vector3Int chunkPosition)
+		{
+			List<Node> foundChunks = new();
+			for (var x = chunkPosition.x - chunkSize; x <= chunkPosition.x + chunkSize; x+= chunkSize)
+			{
+				for (var y = chunkPosition.y - chunkSize; y <= chunkPosition.y + chunkSize; y+= chunkSize)
+				{
+					for (var z = chunkPosition.z - chunkSize; z <= chunkPosition.z + chunkSize; z+= chunkSize)
+					{
+						if (nodes.TryGetValue(new Vector3Int(x, y, z), out var foundChunk))
+						{
+							foundChunks.Add(foundChunk);
+						}
+					}
+				}
+			}
+
+			return foundChunks;
+		}
+		
+		private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, int arraySize, float radius, bool add)
+		{
+			var getCirclePointsJob = new GetCirclePointsJob()
+			{
+				hitPosition = hitPoint,
+				add = add,
+				radius = radius,
+				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.Persistent)
+			};
+			return getCirclePointsJob;
 		}
 	}
 }

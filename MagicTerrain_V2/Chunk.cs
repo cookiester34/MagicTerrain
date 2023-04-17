@@ -16,7 +16,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		
 		public void BuildMesh()
 		{
-			Meshes = new Mesh[1];
+			Meshes ??= new Mesh[1];
 			Meshes[0] = new Mesh();
 			Meshes[0].vertices = ChunkVertices;
 			Meshes[0].triangles = ChunkTriangles;

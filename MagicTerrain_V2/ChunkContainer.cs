@@ -10,10 +10,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		private MeshFilter meshFilter;
 
-		[field:SerializeField]
 		public Chunk Chunk { get; private set; }
+		
+		public Node Node { get; set; }
 
 		public bool IsUsed { get; set; }
+
+		public ChunkCore ChunkCore { get; set; }
 
 		public void AssignChunk(Chunk newChunk)
 		{
@@ -45,6 +48,11 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			if (meshRenderer == null) meshRenderer = gameObject.AddComponent<MeshRenderer>();
 			if (meshCollider == null) meshCollider = gameObject.AddComponent<MeshCollider>();
 			if (meshFilter == null) meshFilter = gameObject.AddComponent<MeshFilter>();
+		}
+
+		public void EditChunk(Vector3 hitPoint, float radius, bool add)
+		{
+			ChunkCore.EditNode(Node, hitPoint, radius, add);
 		}
 	}
 }
