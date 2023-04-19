@@ -195,16 +195,20 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 					var terrainMapEditJob = new EditTerrainMapJob()
 					{
 						diferenceInPosition = diferenceInPosition,
-						points = editedNodePointValues,
+						points = new NativeArray<EditedNodePointValue>(editedNodePointValues, Allocator.Persistent),
 						add = chunkEditJobData.Add,
 						chunkSize = chunkSize,
-						terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap, Allocator.Persistent),
+						terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap.ToArray(), Allocator.Persistent),
 						wasEdited = new NativeArray<bool>(1, Allocator.Persistent)
 					};
 					var jobHandler = terrainMapEditJob.Schedule(editedNodePointValues.Length, 60);
+					JobHandle.ScheduleBatchedJobs();
+
 					queuedNodesTerrainMapEdit.Add(neighbourNode, new EditTerrainMapJobData(jobHandler, terrainMapEditJob));
 					neighbourNode.IsProccessing = true;
 				}
+				circleNodeToRemove.Add(node);
+				chunkEditJobData.GetCirclePointsJob.points.Dispose();
 			}
 
 			foreach (var node in circleNodeToRemove)
@@ -227,13 +231,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				var wasEdited = editTerrainMapJobData.EditTerrainMapJob.wasEdited[0];
 				if (wasEdited)
 				{
+					Debug.Log("Editing");
 					node.Chunk.LocalTerrainMap = editTerrainMapJobData.EditTerrainMapJob.terrainMap.ToArray();
 
 					var meshDataJob = new MeshDataJob
 					{
 						chunkSize = chunkSize + 1,
-						terrainMap = new NativeArray<float>(node.ChunkContainer.Chunk.LocalTerrainMap,
-							Allocator.Persistent),
+						terrainMap = new NativeArray<float>(node.ChunkContainer.Chunk.LocalTerrainMap, Allocator.Persistent),
 						terrainSurface = 0.5f,
 						vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
 						triangles = new NativeArray<int>(900000, Allocator.Persistent),
@@ -247,6 +251,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 					JobHandle.ScheduleBatchedJobs();
 					queuedNodesCheckChunkJobCompletion.Add(node, new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
+				}
+				else
+				{
+					node.IsProccessing = false;
 				}
 				
 				editTerrainMapJobData.EditTerrainMapJob.wasEdited.Dispose();
@@ -399,6 +407,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 				node.ChunkContainer.CreateChunkMesh(coreMaterial);
 				node.IsQueued = false;
+				node.IsProccessing = false;
 
 				if (node.IsDisabled)
 				{
@@ -573,6 +582,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		
 		private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, int arraySize, float radius, bool add)
 		{
+			Debug.Log($"arraySize: {arraySize}, radius: {radius}");
 			var getCirclePointsJob = new GetCirclePointsJob()
 			{
 				hitPosition = hitPoint,

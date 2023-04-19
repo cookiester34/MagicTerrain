@@ -30,7 +30,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			IsUsed = false;
 			CheckContainerHasComponents();
 			meshFilter.sharedMesh = null;
-			// meshCollider.sharedMesh = null;
+			meshCollider.sharedMesh = null;
 		}
 
 		public void CreateChunkMesh(Material material)
