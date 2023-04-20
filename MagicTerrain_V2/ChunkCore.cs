@@ -27,7 +27,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		[SerializeField]
 		private Transform playerTransform;
-		
+
 		[SerializeField]
 		private Camera mainCamera;
 
@@ -84,7 +84,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private Vector3 lastPlayerPosition;
 
 		private int queueUpdateCount;
-		
+
 		private readonly Dictionary<Vector3, Node> nodes = new();
 
 		private readonly List<Node> queuedNodes = new();
@@ -92,9 +92,9 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private readonly Dictionary<Node, ChunkTerrainMapJobData> queuedNodesCheckTerrainMapCompletion = new();
 
 		private readonly Dictionary<Node, ChunkMarchChunkJobData> queuedNodesCheckChunkJobCompletion = new();
-		
+
 		private readonly Dictionary<Node, ChunkEditJobData> queuedNodesCirclePoints = new();
-		
+
 		private readonly Dictionary<Node, EditTerrainMapJobData> queuedNodesTerrainMapEdit = new();
 
 		private readonly List<ChunkContainer> chunkContainers = new();
@@ -123,7 +123,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				chunkContainers.Add(requestedChunkContainer);
 				requestedChunkContainer.gameObject.SetActive(false);
 			}
-			
+
 			var chunkSizeDoubled = chunkSize * 2;
 			terrainMapSize = chunkSizeDoubled * chunkSizeDoubled * chunkSize;
 		}
@@ -143,11 +143,11 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void ManageQueues()
 		{
 			ChecKGetCirclePointJobsQueue();
-			
+
 			CheckEditTerrainMapJobsQueue();
 
 			#region ChunkCreationQueue
-			
+
 			queueUpdateCount++;
 			if (queueUpdateCount % queueUpdateFrequency != 0) return;
 			queueUpdateCount = 0;
@@ -169,9 +169,9 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			foreach (var (node, chunkEditJobData) in queuedNodesCirclePoints)
 			{
 				if (!chunkEditJobData.GetCirclePointsJobHandle.IsCompleted) continue;
-				
+
 				chunkEditJobData.GetCirclePointsJobHandle.Complete();
-				
+
 				var neighbourChunks = GetNeighbourChunks(node.Position);
 				bool isNeighbourChunkAlreadyQueued = false;
 				foreach (var neighbourChunk in neighbourChunks)
@@ -187,7 +187,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 					circleNodeToRemove.Add(node);
 					continue;
 				}
-				
+
 				foreach (var neighbourNode in neighbourChunks)
 				{
 					var diferenceInPosition = node.Position - neighbourNode.Position;
@@ -198,7 +198,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 						points = new NativeArray<EditedNodePointValue>(editedNodePointValues, Allocator.Persistent),
 						add = chunkEditJobData.Add,
 						chunkSize = chunkSize,
-						terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap.ToArray(), Allocator.Persistent),
+						terrainMap = new NativeArray<float>(neighbourNode.Chunk.LocalTerrainMap, Allocator.Persistent),
 						wasEdited = new NativeArray<bool>(1, Allocator.Persistent)
 					};
 					var jobHandler = terrainMapEditJob.Schedule(editedNodePointValues.Length, 60);
@@ -220,18 +220,17 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void CheckEditTerrainMapJobsQueue()
 		{
 			if (queuedNodesTerrainMapEdit.Count <= 0) return;
-			
+
 			List<Node> terrainMapNodeToRemove = new();
 			foreach (var (node, editTerrainMapJobData) in queuedNodesTerrainMapEdit)
 			{
 				if (!editTerrainMapJobData.EditTerrainMapJobHandle.IsCompleted) continue;
-				
+
 				editTerrainMapJobData.EditTerrainMapJobHandle.Complete();
-				
+
 				var wasEdited = editTerrainMapJobData.EditTerrainMapJob.wasEdited[0];
 				if (wasEdited)
 				{
-					Debug.Log("Editing");
 					node.Chunk.LocalTerrainMap = editTerrainMapJobData.EditTerrainMapJob.terrainMap.ToArray();
 
 					var meshDataJob = new MeshDataJob
@@ -256,10 +255,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				{
 					node.IsProccessing = false;
 				}
-				
+
 				editTerrainMapJobData.EditTerrainMapJob.wasEdited.Dispose();
 				editTerrainMapJobData.EditTerrainMapJob.terrainMap.Dispose();
-				
+
 				terrainMapNodeToRemove.Add(node);
 			}
 
@@ -271,10 +270,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		private void SchedualTerrainMapJobsQueue()
 		{
-			
+
 			var playerPosition = playerTransform.position;
 			if (queueDequeueLimit <= queuedNodesCheckTerrainMapCompletion.Count || queuedNodes.Count <= 0) return;
-			
+
 			var orderedEnumerable = queuedNodes.OrderBy(node =>
 				Vector3.Distance(node.Position, playerPosition));
 
@@ -327,7 +326,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void SchedualMeshCreationJobsQueue()
 		{
 			if (queuedNodesCheckTerrainMapCompletion.Count <= 0) return;
-			
+
 			List<Node> terrainMapNodeToRemove = new();
 			foreach (var (node, creationQueueData) in queuedNodesCheckTerrainMapCompletion)
 			{
@@ -370,7 +369,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void CheckMeshCreationJobQueue()
 		{
 			if (queuedNodesCheckChunkJobCompletion.Count <= 0) return;
-			
+
 			List<Node> chunkCreationNodeToRemove = new();
 			foreach (var (node, creationQueueData) in queuedNodesCheckChunkJobCompletion)
 			{
@@ -431,16 +430,16 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			// 	var planes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
 			// 	return;
 			// }
-			
+
 			var playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(playerTransform.position);
 			var playerPosition = new Vector3Int(
 				Mathf.RoundToInt(playerLastPositionRelative.x).RoundOff(chunkSize),
 				Mathf.RoundToInt(playerLastPositionRelative.y).RoundOff(chunkSize),
 				Mathf.RoundToInt(playerLastPositionRelative.z).RoundOff(chunkSize));
-			
+
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
 			if (!(distance >= updateDistance) && !forceUpdate) return;
-			
+
 			lastPlayerPosition = playerPosition;
 			forceUpdate = false;
 
@@ -448,7 +447,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			visiblePositions.Clear();
 
 			var trueViewDistance = viewDistance * chunkSize;
-			
+
 			for (var x = playerPosition.x - trueViewDistance; x < playerPosition.x + trueViewDistance; x += chunkSize)
 			for (var y = playerPosition.y - trueViewDistance; y < playerPosition.y + trueViewDistance; y += chunkSize)
 			for (var z = playerPosition.z - trueViewDistance; z < playerPosition.z + trueViewDistance; z += chunkSize)
@@ -461,7 +460,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				}
 				visiblePositions.Add(position);
 			}
-			
+
 			foreach (var position in lastVisibleNodes)
 			{
 				if (visiblePositions.Contains(position)) continue;
@@ -491,7 +490,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				if (chunkContainer.IsUsed) continue;
 				foundContainer = chunkContainer;
 			}
-			
+
 			if (foundContainer != null)
 			{
 				foundContainer.AssignChunk(chunk);
@@ -536,24 +535,24 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			chunkContainer.gameObject.SetActive(false);
 			chunkContainer.UnAssignChunk();
 		}
-		
+
 		public void EditNode(Node node, Vector3 hitPoint, float radius, bool add)
 		{
 			var neighbourNodes = GetNeighbourChunks(node.Position);
 
 			if (neighbourNodes.Any(x => x.IsProccessing)) return;
-			
+
 			if (queuedNodesCirclePoints.ContainsKey(node))
 			{
 				Debug.LogError("Failed to add chunk to edit queue, cancelling edit");
 				return;
 			}
-			
+
 			node.IsProccessing = true;
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
 
-			var getCirclePointsJob = GetCirclePointJobs(hitPoint, arraySize, radius, add);
+			var getCirclePointsJob = GetCirclePointJobs(node.Position, hitPoint, arraySize, radius, add);
 			var jobHandle = getCirclePointsJob.Schedule();
 			queuedNodesCirclePoints.Add(node, new ChunkEditJobData(jobHandle, getCirclePointsJob, add));
 
@@ -579,16 +578,16 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 			return foundChunks;
 		}
-		
-		private GetCirclePointsJob GetCirclePointJobs(Vector3 hitPoint, int arraySize, float radius, bool add)
+
+		private GetCirclePointsJob GetCirclePointJobs(Vector3 nodePosition, Vector3 hitPoint, int arraySize, float radius, bool add)
 		{
-			Debug.Log($"arraySize: {arraySize}, radius: {radius}");
 			var getCirclePointsJob = new GetCirclePointsJob()
 			{
+				chunkPosition = nodePosition,
 				hitPosition = hitPoint,
 				add = add,
 				radius = radius,
-				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.Persistent)
+				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.Persistent),
 			};
 			return getCirclePointsJob;
 		}

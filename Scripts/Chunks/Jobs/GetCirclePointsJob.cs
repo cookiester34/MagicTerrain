@@ -51,9 +51,6 @@ namespace Scripts.Chunks.Jobs
 			Vector3 rotatedPosition = transformationMatrix.MultiplyPoint(chunkPosition);
 
 			var chunkTranslation = Matrix4x4.Translate(rotatedPosition);
-			var worldRotationMatrix = Matrix4x4.Rotate(worldRotation);
-			var newRotation = chunkTranslation;
-
 
 			var chunkScale = Matrix4x4.Scale(new Vector3(scale, scale, scale));
 			var chunkTransformation = chunkScale * chunkTranslation.inverse;
