@@ -50,9 +50,9 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			if (meshFilter == null) meshFilter = gameObject.AddComponent<MeshFilter>();
 		}
 
-		public void EditChunk(Vector3 hitPoint, float radius, bool add)
+		public void EditChunk(Vector3Int hitPoint, float radius, bool add)
 		{
-			ChunkCore.EditNode(Node, hitPoint, radius, add);
+			ChunkCore.EditNode(Node, new Vector3Int(hitPoint.x, hitPoint.y, hitPoint.z), radius, add);
 		}
 	}
 }

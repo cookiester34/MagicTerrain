@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Jobs;
+using UnityEditor;
 using UnityEngine;
 
 namespace SubModules.MagicTerrain.MagicTerrain_V2
@@ -107,7 +108,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		private float TrueWorldSize => worldSize * chunkSize;
 
-		private HashSet<Vector3> visiblePositions { get; } = new();
+		private HashSet<Vector3> VisiblePositions { get; } = new();
+		
+		private Vector3 editedNodePointValuePosition;
+		private List<EditedNodePointValue> editedNodePointValues = new();
 
 		private void Start()
 		{
@@ -138,6 +142,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void OnDrawGizmos()
 		{
 			if (!DebugMode) return;
+			
+			editedNodePointValues.ForEach(editedNodePointValue =>
+			{
+				Gizmos.color = Color.red;
+				Gizmos.DrawSphere(editedNodePointValuePosition + editedNodePointValue.PointPosition, 0.1f);
+				Handles.Label(editedNodePointValuePosition + editedNodePointValue.PointPosition, editedNodePointValue.PointTValue.ToString());
+			});
 		}
 
 		private void ManageQueues()
@@ -173,7 +184,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				chunkEditJobData.GetCirclePointsJobHandle.Complete();
 
 				var neighbourChunks = GetNeighbourChunks(node.Position);
-				bool isNeighbourChunkAlreadyQueued = false;
+				var isNeighbourChunkAlreadyQueued = false;
 				foreach (var neighbourChunk in neighbourChunks)
 				{
 					if (queuedNodesTerrainMapEdit.ContainsKey(neighbourChunk))
@@ -188,25 +199,31 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 					continue;
 				}
 
+				var editedNodePointValues = chunkEditJobData.GetCirclePointsJob.points;
+				this.editedNodePointValues.Clear();
+				this.editedNodePointValues.AddRange(editedNodePointValues);
+				editedNodePointValuePosition = node.Position;
+				
 				foreach (var neighbourNode in neighbourChunks)
 				{
 					var diferenceInPosition = node.Position - neighbourNode.Position;
-					var editedNodePointValues = chunkEditJobData.GetCirclePointsJob.points;
+					
 					var terrainMapEditJob = new EditTerrainMapJob()
 					{
 						diferenceInPosition = diferenceInPosition,
 						points = new NativeArray<EditedNodePointValue>(editedNodePointValues, Allocator.Persistent),
 						add = chunkEditJobData.Add,
-						chunkSize = chunkSize,
+						chunkSize = chunkSize + 1,
 						terrainMap = new NativeArray<float>(neighbourNode.Chunk.LocalTerrainMap, Allocator.Persistent),
 						wasEdited = new NativeArray<bool>(1, Allocator.Persistent)
 					};
 					var jobHandler = terrainMapEditJob.Schedule(editedNodePointValues.Length, 60);
 					JobHandle.ScheduleBatchedJobs();
-
+				
 					queuedNodesTerrainMapEdit.Add(neighbourNode, new EditTerrainMapJobData(jobHandler, terrainMapEditJob));
 					neighbourNode.IsProccessing = true;
 				}
+				
 				circleNodeToRemove.Add(node);
 				chunkEditJobData.GetCirclePointsJob.points.Dispose();
 			}
@@ -443,8 +460,8 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			lastPlayerPosition = playerPosition;
 			forceUpdate = false;
 
-			var lastVisibleNodes = visiblePositions.ToList();
-			visiblePositions.Clear();
+			var lastVisibleNodes = VisiblePositions.ToList();
+			VisiblePositions.Clear();
 
 			var trueViewDistance = viewDistance * chunkSize;
 
@@ -458,16 +475,16 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 					var chunkPosition = new Vector3Int(x,y,z);
 					nodes.Add(position, new Node(chunkPosition, chunkSize, RequestChunk(chunkPosition), this));
 				}
-				visiblePositions.Add(position);
+				VisiblePositions.Add(position);
 			}
 
 			foreach (var position in lastVisibleNodes)
 			{
-				if (visiblePositions.Contains(position)) continue;
+				if (VisiblePositions.Contains(position)) continue;
 				nodes[position].Disable();
 			}
 
-			foreach (var nodePosition in visiblePositions)
+			foreach (var nodePosition in VisiblePositions)
 			{
 				nodes[nodePosition].EnableNode();
 			}
@@ -551,8 +568,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			node.IsProccessing = true;
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
+			
+			hitPoint -= node.Position;
 
-			var getCirclePointsJob = GetCirclePointJobs(node.Position, hitPoint, arraySize, radius, add);
+			var getCirclePointsJob = GetCirclePointJobs(new Vector3Int((int)hitPoint.x, (int)hitPoint.y, (int)hitPoint.z), arraySize, radius, add);
 			var jobHandle = getCirclePointsJob.Schedule();
 			queuedNodesCirclePoints.Add(node, new ChunkEditJobData(jobHandle, getCirclePointsJob, add));
 
@@ -579,15 +598,14 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			return foundChunks;
 		}
 
-		private GetCirclePointsJob GetCirclePointJobs(Vector3 nodePosition, Vector3 hitPoint, int arraySize, float radius, bool add)
+		private GetCirclePointsJob GetCirclePointJobs(Vector3Int hitPoint, int arraySize, float radius, bool add)
 		{
 			var getCirclePointsJob = new GetCirclePointsJob()
 			{
-				chunkPosition = nodePosition,
 				hitPosition = hitPoint,
 				add = add,
 				radius = radius,
-				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.Persistent),
+				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.Persistent)
 			};
 			return getCirclePointsJob;
 		}

@@ -30,32 +30,23 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2.Jobs
 		public void Execute(int index)
 		{
 			var editedChunkPointValue = points[index];
+			//get the point relative to this chunk
 			var relativePosition = editedChunkPointValue.PointPosition + diferenceInPosition;
 
+			//check if the point is within the chunk
 			if (relativePosition.x < 0 || relativePosition.y < 0 || relativePosition.z < 0
-			    || relativePosition.x >= chunkSize || relativePosition.y >= chunkSize ||
-			    relativePosition.z >= chunkSize) return; 
+			    || relativePosition.x >= chunkSize || relativePosition.y >= chunkSize || relativePosition.z >= chunkSize) return; 
 				
 			var terrainMapIndex = relativePosition.x + chunkSize * (relativePosition.y + chunkSize * relativePosition.z);
 
 			var isWithinBounds = terrainMapIndex >= 0 && terrainMapIndex < terrainMap.Length;
 
 			if (!isWithinBounds) return;
-
-			var pointValue = editedChunkPointValue.PointValue;
-			if (add)
-			{
-				if (terrainMap[terrainMapIndex] <= pointValue)
-					return;
-			}
-			else
-			{
-				if (terrainMap[terrainMapIndex] >= pointValue)
-					return;
-			}
-
+			
+			var pointValue = editedChunkPointValue.PointTValue;
+			var terrain = terrainMap[terrainMapIndex];
+			terrainMap[terrainMapIndex] = Mathf.Lerp(terrain, add ? 0 : 1, 0.04f * pointValue);
 			wasEdited[0] = true;
-			terrainMap[terrainMapIndex] = pointValue;
 		}
 	}
 }
