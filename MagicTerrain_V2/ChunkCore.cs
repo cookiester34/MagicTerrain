@@ -111,8 +111,14 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private float TrueWorldSize => worldSize * chunkSize;
 
 		private HashSet<Vector3> VisiblePositions { get; } = new();
+
+		private Vector3 planetPositionLastUpdate;
 		
+		private Quaternion planetRotationLastUpdate;
+		
+		//debug info
 		private Vector3 editedNodePointValuePosition;
+		
 		private List<EditedNodePointValue> editedNodePointValues = new();
 
 		private void Start()
@@ -456,6 +462,8 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
 			if (!(distance >= updateDistance) && !forceUpdate) return;
 
+			planetPositionLastUpdate = transform.position;
+			planetRotationLastUpdate = transform.rotation;
 			lastPlayerPosition = playerPosition;
 			forceUpdate = false;
 
@@ -463,7 +471,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			VisiblePositions.Clear();
 
 			var trueViewDistance = viewDistance * chunkSize;
-
+			
 			for (var x = playerPosition.x - trueViewDistance; x < playerPosition.x + trueViewDistance; x += chunkSize)
 			for (var y = playerPosition.y - trueViewDistance; y < playerPosition.y + trueViewDistance; y += chunkSize)
 			for (var z = playerPosition.z - trueViewDistance; z < playerPosition.z + trueViewDistance; z += chunkSize)
@@ -472,7 +480,9 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				if (!nodes.ContainsKey(position))
 				{
 					var chunkPosition = new Vector3Int(x,y,z);
-					nodes.Add(position, new Node(chunkPosition, chunkSize, RequestChunk(chunkPosition), this));
+					var rotatedPosition = Matrix4x4.Rotate(transform.rotation).MultiplyPoint(position);
+					var realPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z);
+					nodes.Add(position, new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
 				}
 				VisiblePositions.Add(position);
 			}
@@ -510,7 +520,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			if (foundContainer != null)
 			{
 				foundContainer.AssignChunk(chunk);
-				foundContainer.transform.position = position;
+				foundContainer.transform.localPosition = position;
 
 				if (chunk is { Hasdata: false })
 				{
@@ -528,7 +538,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
 			requestedChunkContainer.ChunkCore = this;
 			requestedChunkContainer.AssignChunk(chunk);
-			requestedChunkContainer.transform.position = position;
+			requestedChunkContainer.transform.localPosition = position;
 
 			if (chunk is { Hasdata: false })
 			{

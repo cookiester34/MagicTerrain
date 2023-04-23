@@ -19,6 +19,10 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		[SerializeField]
 		private Vector3Int position;
 		public Vector3Int Position => position;
+		
+		[SerializeField]
+		private Vector3 positionReal;
+		public Vector3 PositionReal => positionReal;
 
 		[SerializeField]
 		private ChunkContainer chunkContainer;
@@ -41,12 +45,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		public bool IsProccessing { get; set; }
 
-		public Node(Vector3Int position, int size, Chunk chunk, ChunkCore chunkCore)
+		public Node(Vector3Int position, Vector3 positionReal, int size, Chunk chunk, ChunkCore chunkCore)
 		{
 			this.chunkCore = chunkCore;
 			this.position = position;
+			this.positionReal = positionReal;
 			this.chunk = chunk;
-			NodeBounds = new Bounds(position, Vector3.one * size);
+			NodeBounds = new Bounds(positionReal, Vector3.one * size);
 			
 			IsDisabled = true;
 			IsLoaded = false;
@@ -57,6 +62,11 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		{
 			chunkContainer = chunkCore.RequestChunkContainer(position, this, chunk);
 			chunkContainer.Node = this;
+		}
+
+		public void UpdateChunkRotationAndPosition()
+		{
+			
 		}
 
 		public void ReturnChunk()
