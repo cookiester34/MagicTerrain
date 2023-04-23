@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Jobs;
-using UnityEditor;
 using UnityEngine;
 
 namespace SubModules.MagicTerrain.MagicTerrain_V2
@@ -80,6 +79,9 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		[SerializeField]
 		private Material coreMaterial;
 
+		[SerializeField]
+		private ChunkContainer chunkContainerPrefab;
+
 		private bool forceUpdate = true;
 
 		private Vector3 lastPlayerPosition;
@@ -119,9 +121,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 			for (var i = 0; i < chunkContainerStartPoolCount; i++)
 			{
-				var chunkContainerObject = new GameObject("ChunkContainer");
-				chunkContainerObject.transform.SetParent(transform);
-				var requestedChunkContainer = chunkContainerObject.AddComponent<ChunkContainer>();
+				var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
 				requestedChunkContainer.ChunkCore = this;
 				requestedChunkContainer.transform.position = Vector3.zero;
 				chunkContainers.Add(requestedChunkContainer);
@@ -147,7 +147,6 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			{
 				Gizmos.color = Color.red;
 				Gizmos.DrawSphere(editedNodePointValuePosition + editedNodePointValue.PointPosition, 0.1f);
-				Handles.Label(editedNodePointValuePosition + editedNodePointValue.PointPosition, editedNodePointValue.PointTValue.ToString());
 			});
 		}
 
@@ -526,9 +525,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 				return foundContainer;
 			}
 
-			var chunkContainerObject = new GameObject("ChunkContainer");
-			chunkContainerObject.transform.SetParent(transform);
-			var requestedChunkContainer = chunkContainerObject.AddComponent<ChunkContainer>();
+			var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
 			requestedChunkContainer.ChunkCore = this;
 			requestedChunkContainer.AssignChunk(chunk);
 			requestedChunkContainer.transform.position = position;

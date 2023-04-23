@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 namespace SubModules.MagicTerrain.MagicTerrain_V2
 {
@@ -17,6 +18,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		public bool IsUsed { get; set; }
 
 		public ChunkCore ChunkCore { get; set; }
+
+		private void Awake()
+		{
+			if (meshRenderer == null) meshRenderer = gameObject.GetComponent<MeshRenderer>();
+			if (meshCollider == null) meshCollider = gameObject.GetComponent<MeshCollider>();
+			if (meshFilter == null) meshFilter = gameObject.GetComponent<MeshFilter>();
+		}
 
 		public void AssignChunk(Chunk newChunk)
 		{
