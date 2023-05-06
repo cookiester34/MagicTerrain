@@ -138,7 +138,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			terrainMapSize = chunkSizeDoubled * chunkSizeDoubled * chunkSize;
 		}
 
-		private void Update()
+		private void FixedUpdate()
 		{
 			ManageQueues();
 
@@ -148,7 +148,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 		private void OnDrawGizmos()
 		{
 			if (!DebugMode) return;
-			
+
 			editedNodePointValues.ForEach(editedNodePointValue =>
 			{
 				Gizmos.color = Color.red;
@@ -297,7 +297,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			if (queueDequeueLimit <= queuedNodesCheckTerrainMapCompletion.Count || queuedNodes.Count <= 0) return;
 
 			var orderedEnumerable = queuedNodes.OrderBy(node =>
-				Vector3.Distance(node.Position, playerPosition));
+				Vector3.Distance(node.PositionReal, playerPosition));
 
 			foreach (var node in orderedEnumerable)
 			{
@@ -318,7 +318,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 					{
 						chunkSize = chunkSize + 1,
 						chunkPosition = node.Position,
-						planetCenter = CorePosition,
+						planetCenter = Vector3.zero,
 						planetSize = TrueWorldSize,
 						octaves = octaves,
 						weightedStrength = weightedStrength,
@@ -471,16 +471,21 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			VisiblePositions.Clear();
 
 			var trueViewDistance = viewDistance * chunkSize;
+			var trueWorldSize = TrueWorldSize * 1.5f;
 			
 			for (var x = playerPosition.x - trueViewDistance; x < playerPosition.x + trueViewDistance; x += chunkSize)
 			for (var y = playerPosition.y - trueViewDistance; y < playerPosition.y + trueViewDistance; y += chunkSize)
 			for (var z = playerPosition.z - trueViewDistance; z < playerPosition.z + trueViewDistance; z += chunkSize)
 			{
 				var position = new Vector3(x,y,z);
+				
+				//chunk lays outside of the planet
+				if (Vector3.Distance(position, Vector3.zero) >= trueWorldSize) continue;
+				
 				if (!nodes.ContainsKey(position))
 				{
 					var chunkPosition = new Vector3Int(x,y,z);
-					var rotatedPosition = Matrix4x4.Rotate(transform.rotation).MultiplyPoint(position);
+					var rotatedPosition = Matrix4x4.Rotate(planetRotationLastUpdate) * transform.localToWorldMatrix.MultiplyPoint(position);
 					var realPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z);
 					nodes.Add(position, new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
 				}
@@ -576,6 +581,13 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
 			
+			if (arraySize <= 0)
+			{
+				node.IsProccessing = false;
+				return;
+			}
+			
+			hitPoint = transform.worldToLocalMatrix.MultiplyPoint(hitPoint);
 			hitPoint -= node.Position;
 
 			var getCirclePointsJob = GetCirclePointJobs(new Vector3Int((int)hitPoint.x, (int)hitPoint.y, (int)hitPoint.z), arraySize, radius, add);
