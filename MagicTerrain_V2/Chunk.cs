@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2
+namespace MagicTerrain_V2
 {
 	[Serializable]
 	public class Chunk

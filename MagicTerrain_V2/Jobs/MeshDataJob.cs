@@ -5,7 +5,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using static LookupTable;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2.Jobs
+namespace MagicTerrain_V2.Jobs
 {
 	[BurstCompile]
 	public struct MeshDataJob : IJob

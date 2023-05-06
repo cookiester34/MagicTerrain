@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2
+namespace MagicTerrain_V2
 {
 	public class ChunkEditingController : MonoBehaviour
 	{

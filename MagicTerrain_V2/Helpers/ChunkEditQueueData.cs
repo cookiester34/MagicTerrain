@@ -1,8 +1,8 @@
-﻿using SubModules.MagicTerrain.MagicTerrain_V2.Jobs;
+﻿using MagicTerrain_V2.Jobs;
 using System;
 using Unity.Jobs;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2.Helpers
+namespace MagicTerrain_V2.Helpers
 {
 	[Serializable]
 	public struct ChunkEditJobData

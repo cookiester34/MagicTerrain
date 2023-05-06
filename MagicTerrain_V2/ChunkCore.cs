@@ -1,14 +1,15 @@
-using SubModules.MagicTerrain.MagicTerrain_V2.Helpers;
-using SubModules.MagicTerrain.MagicTerrain_V2.Jobs;
+using MagicTerrain_V2.Gravity;
+using MagicTerrain_V2.Helpers;
+using MagicTerrain_V2.Jobs;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2
+namespace MagicTerrain_V2
 {
-	public class ChunkCore : MonoBehaviour
+	public class ChunkCore : GravityInflucener
 	{
 		[field: SerializeField]
 		public bool DebugMode { get; set; }
@@ -123,6 +124,7 @@ namespace SubModules.MagicTerrain.MagicTerrain_V2
 
 		private void Start()
 		{
+			base.Start();
 			lastPlayerPosition = playerTransform.position;
 
 			for (var i = 0; i < chunkContainerStartPoolCount; i++)

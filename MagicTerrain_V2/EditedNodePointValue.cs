@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2
+namespace MagicTerrain_V2
 {
 	public struct EditedNodePointValue
 	{

@@ -1,10 +1,10 @@
-﻿using SubModules.MagicTerrain.MagicTerrain_V2.Helpers;
+﻿using MagicTerrain_V2.Helpers;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2.Jobs
+namespace MagicTerrain_V2.Jobs
 {
 	[BurstCompile]
 	public struct TerrainMapJob : IJobParallelFor

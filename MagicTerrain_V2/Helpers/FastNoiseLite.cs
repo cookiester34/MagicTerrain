@@ -54,7 +54,7 @@ using FNLfloat = System.Single;
 
 //using FNLfloat = System.Double;
 
-namespace SubModules.MagicTerrain.MagicTerrain_V2.Helpers
+namespace MagicTerrain_V2.Helpers
 {
 	public class FastNoiseLite
 	{
