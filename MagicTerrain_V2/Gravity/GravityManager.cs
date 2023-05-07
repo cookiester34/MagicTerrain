@@ -65,7 +65,11 @@ namespace MagicTerrain_V2.Gravity
 				// Get the direction from sourceObject to targetObject
 				Vector3 direction = (gravityObjectGravityInflucener.transform.position - gravityObjectGravitySimulatedObject.transform.position).normalized;
 				gravityObjectGravitySimulatedObject.GravityDirection = direction;
-				gravityObjectGravitySimulatedObject.Rigidbody.AddForce(direction * Time.deltaTime * gravityObjectGravityInflucener.GrravityStrength, ForceMode.VelocityChange);
+				gravityObjectGravitySimulatedObject.Rigidbody.AddForce(direction * Time.deltaTime * gravityObjectGravityInflucener.GravityStrength, ForceMode.VelocityChange);
+
+				ApplyResistance(gravityObjectGravitySimulatedObject, gravityObjectGravityInflucener);
+
+				ApplyRotation(gravityObjectGravitySimulatedObject, gravityObjectGravityInflucener);
 			}
 
 			frame++;
@@ -74,6 +78,30 @@ namespace MagicTerrain_V2.Gravity
 				frame = 0;
 				AssignGravityInfluencers();
 			}
+		}
+		
+		private void ApplyResistance(GravitySimulatedObject gravitySimulatedObject, GravityInflucener gravityInflucener)
+		{
+			// Check if the object is moving downward (y component of velocity is negative)
+			var rigidbody = gravitySimulatedObject.Rigidbody;
+			if (!(rigidbody.velocity.y < 0)) return;
+			
+			// Calculate the resistance force direction (opposite to the current velocity)
+			var resistanceDirection = -rigidbody.velocity.normalized;
+
+			// Calculate the magnitude of the resistance force using a quadratic function
+			var speed = rigidbody.velocity.magnitude;
+			var resistanceMagnitude = (speed * gravityInflucener.AirResistance) / gravitySimulatedObject.ObjectWeight;
+
+			// Apply the resistance force to the Rigidbody
+			rigidbody.AddForce(resistanceDirection * resistanceMagnitude, ForceMode.Force);
+		}
+
+		private void ApplyRotation(GravitySimulatedObject gravitySimulatedObject, GravityInflucener gravityInflucener)
+		{
+			// Calculate the vector from the pivot point to the object
+			var gravityInflucenerTransform = gravityInflucener.transform;
+			var gravitySimulatedObjectTransform = gravitySimulatedObject.transform;
 		}
 	}
 }

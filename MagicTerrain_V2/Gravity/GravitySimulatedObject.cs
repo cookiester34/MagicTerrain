@@ -5,6 +5,9 @@ namespace MagicTerrain_V2.Gravity
 	[RequireComponent(typeof(Rigidbody))]
 	public class GravitySimulatedObject : MonoBehaviour
 	{
+		[field: SerializeField]
+		public float ObjectWeight { get; set; } = 5f;
+		
 		public bool IsAffectedByGravity { get; set; }
 		public Vector3 GravityDirection { get; set; }
 		public Rigidbody Rigidbody { get; private set; }

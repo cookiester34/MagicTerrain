@@ -22,6 +22,9 @@ namespace MagicTerrain_V2
 
 		[SerializeField]
 		private int viewDistance = 2;
+		
+		[SerializeField]
+		private int ignoreFrustrumCullDistance = 2;
 
 		[SerializeField]
 		private int updateDistance = 20;
@@ -105,15 +108,11 @@ namespace MagicTerrain_V2
 
 		private readonly Dictionary<Vector3Int, Chunk> registeredChunks = new();
 
-		private Vector3 CorePosition => transform.position;
-
 		private int terrainMapSize;
 
 		private float TrueWorldSize => worldSize * chunkSize;
 
 		private HashSet<Vector3> VisiblePositions { get; } = new();
-
-		private Vector3 planetPositionLastUpdate;
 		
 		private Quaternion planetRotationLastUpdate;
 		
@@ -121,11 +120,19 @@ namespace MagicTerrain_V2
 		private Vector3 editedNodePointValuePosition;
 		
 		private List<EditedNodePointValue> editedNodePointValues = new();
+		
+		private Plane[] cameraPlanes;
+
+		private int trueIgnoreCullDistance;
+		
+		private int trueViewDistance;
 
 		private void Start()
 		{
 			base.Start();
 			lastPlayerPosition = playerTransform.position;
+			trueIgnoreCullDistance = ignoreFrustrumCullDistance * chunkSize;
+			trueViewDistance = viewDistance * chunkSize;
 
 			for (var i = 0; i < chunkContainerStartPoolCount; i++)
 			{
@@ -448,12 +455,7 @@ namespace MagicTerrain_V2
 
 		private void CalculateVisibleNodes()
 		{
-			// if (mainCamera == null)
-			// {
-			// 	Debug.LogError("Cannot Calculate Visible Nodes without a camera");
-			// 	var planes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
-			// 	return;
-			// }
+			cameraPlanes = GeometryUtility.CalculateFrustumPlanes(mainCamera);
 
 			var playerLastPositionRelative = transform.worldToLocalMatrix.MultiplyPoint(playerTransform.position);
 			var playerPosition = new Vector3Int(
@@ -462,47 +464,86 @@ namespace MagicTerrain_V2
 				Mathf.RoundToInt(playerLastPositionRelative.z).RoundOff(chunkSize));
 
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
-			if (!(distance >= updateDistance) && !forceUpdate) return;
-
-			planetPositionLastUpdate = transform.position;
-			planetRotationLastUpdate = transform.rotation;
-			lastPlayerPosition = playerPosition;
-			forceUpdate = false;
-
-			var lastVisibleNodes = VisiblePositions.ToList();
-			VisiblePositions.Clear();
-
-			var trueViewDistance = viewDistance * chunkSize;
-			var trueWorldSize = TrueWorldSize * 1.5f;
-			
-			for (var x = playerPosition.x - trueViewDistance; x < playerPosition.x + trueViewDistance; x += chunkSize)
-			for (var y = playerPosition.y - trueViewDistance; y < playerPosition.y + trueViewDistance; y += chunkSize)
-			for (var z = playerPosition.z - trueViewDistance; z < playerPosition.z + trueViewDistance; z += chunkSize)
+			if (distance >= updateDistance || forceUpdate)
 			{
-				var position = new Vector3(x,y,z);
+				planetRotationLastUpdate = transform.rotation;
+				lastPlayerPosition = playerPosition;
+				forceUpdate = false;
+
+				var lastVisibleNodes = VisiblePositions.ToList();
+				VisiblePositions.Clear();
 				
-				//chunk lays outside of the planet
-				if (Vector3.Distance(position, Vector3.zero) >= trueWorldSize) continue;
-				
-				if (!nodes.ContainsKey(position))
+				var trueWorldSize = TrueWorldSize * 1.5f;
+
+				for (var x = playerPosition.x - trueViewDistance;
+				     x < playerPosition.x + trueViewDistance;
+				     x += chunkSize)
+				for (var y = playerPosition.y - trueViewDistance;
+				     y < playerPosition.y + trueViewDistance;
+				     y += chunkSize)
+				for (var z = playerPosition.z - trueViewDistance;
+				     z < playerPosition.z + trueViewDistance;
+				     z += chunkSize)
 				{
-					var chunkPosition = new Vector3Int(x,y,z);
-					var rotatedPosition = Matrix4x4.Rotate(planetRotationLastUpdate) * transform.localToWorldMatrix.MultiplyPoint(position);
+					var position = new Vector3(x, y, z);
+
+					//chunk lays outside of the planet
+					if (Vector3.Distance(position, Vector3.zero) >= trueWorldSize) continue;
+
+					var rotatedPosition = Matrix4x4.Rotate(planetRotationLastUpdate) *
+					                      transform.localToWorldMatrix.MultiplyPoint(position);
 					var realPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z);
-					nodes.Add(position, new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
+					
+					if (!nodes.ContainsKey(position))
+					{
+						var chunkPosition = new Vector3Int(x, y, z);
+						nodes.Add(position,
+							new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
+					}
+					else
+					{
+						nodes[position].PositionReal = realPosition;
+					}
+
+					VisiblePositions.Add(position);
 				}
-				VisiblePositions.Add(position);
+
+				foreach (var position in lastVisibleNodes)
+				{
+					if (VisiblePositions.Contains(position)) continue;
+					nodes[position].Disable();
+				}
+
+				FrustrumCullVisibleNodes();
+				return;
 			}
 
-			foreach (var position in lastVisibleNodes)
-			{
-				if (VisiblePositions.Contains(position)) continue;
-				nodes[position].Disable();
-			}
+			FrustrumCullVisibleNodes();
+		}
 
+		private void FrustrumCullVisibleNodes()
+		{
 			foreach (var nodePosition in VisiblePositions)
 			{
-				nodes[nodePosition].EnableNode();
+				var node = nodes[nodePosition];
+
+				if (mainCamera == null)
+				{
+					Debug.LogError("Cannot perform frustrum culling without a camera");
+					node.EnableNode();
+					continue;
+				}
+				if (!node.IsNodeVisible(cameraPlanes))
+				{
+					var distance = Vector3.Distance(playerTransform.position, node.PositionReal);
+					if (distance > trueIgnoreCullDistance)
+					{
+						node.Disable();
+						continue;
+					}
+				}
+				
+				node.EnableNode();
 			}
 		}
 

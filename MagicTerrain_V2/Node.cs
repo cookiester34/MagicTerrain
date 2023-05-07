@@ -22,7 +22,11 @@ namespace MagicTerrain_V2
 		
 		[SerializeField]
 		private Vector3 positionReal;
-		public Vector3 PositionReal => positionReal;
+		public Vector3 PositionReal
+		{
+			get => positionReal;
+			set => positionReal = value;
+		}
 
 		[SerializeField]
 		private ChunkContainer chunkContainer;
@@ -40,19 +44,18 @@ namespace MagicTerrain_V2
 		[field:SerializeField]
 		public bool IsQueued { get; set; }
 
-		[field:SerializeField]
-		private Bounds NodeBounds { get; set; }
-
 		public bool IsProccessing { get; set; }
+
+		private int size;
 
 		public Node(Vector3Int position, Vector3 positionReal, int size, Chunk chunk, ChunkCore chunkCore)
 		{
+			this.size = size * 2;
 			this.chunkCore = chunkCore;
 			this.position = position;
 			this.positionReal = positionReal;
 			this.chunk = chunk;
-			NodeBounds = new Bounds(positionReal, Vector3.one * size);
-			
+
 			IsDisabled = true;
 			IsLoaded = false;
 			IsVisible = false;
@@ -62,11 +65,6 @@ namespace MagicTerrain_V2
 		{
 			chunkContainer = chunkCore.RequestChunkContainer(position, this, chunk);
 			chunkContainer.Node = this;
-		}
-
-		public void UpdateChunkRotationAndPosition()
-		{
-			
 		}
 
 		public void ReturnChunk()
@@ -92,10 +90,11 @@ namespace MagicTerrain_V2
 			IsVisible = true;
 		}
 		
-		private bool IsNodeVisible(Plane[] planes)
+		public bool IsNodeVisible(Plane[] planes)
 		{
+			var nodeBounds = new Bounds(positionReal, Vector3.one * size);
 			// Check if the renderer is within the view frustum of the camera
-			var visible = GeometryUtility.TestPlanesAABB(planes, NodeBounds);
+			var visible = GeometryUtility.TestPlanesAABB(planes, nodeBounds);
 			return visible;
 		}
 

@@ -177,13 +177,13 @@ namespace MagicTerrain_V2.Movment
 			 {
 				 PerformedMovement();
 				 
-				 if (groundedRaysCount > 10)
-				 {
-					 var positions = groundedRays.Where(data => data.IsGrounded);
-					 var totalPositions = positions.Aggregate(Vector3.zero, (current, position) => current + (position.position + Vector3.up));
-					 var averagePosition = totalPositions / groundedRaysCount;
-					 transform.position = averagePosition;
-				 }
+				 // if (groundedRaysCount > 10)
+				 // {
+					//  var positions = groundedRays.Where(data => data.IsGrounded);
+					//  var totalPositions = positions.Aggregate(Vector3.zero, (current, position) => current + (position.position + Vector3.up));
+					//  var averagePosition = totalPositions / groundedRaysCount;
+					//  transform.position = averagePosition;
+				 // }
 			 }
 
 			 //decelerate the player
@@ -192,8 +192,7 @@ namespace MagicTerrain_V2.Movment
 				//  rigidbody.velocity = Vector3.Lerp(rigidbody.velocity, Vector3.zero,
 				// 	 (isGrounded ? deceleration : airDeceleration) * Time.fixedDeltaTime);
 			 // }
-			 ApplyResistance();
-			 
+
 			 ClampRigidbodyVelocity();
 		}
 
@@ -209,22 +208,6 @@ namespace MagicTerrain_V2.Movment
 			var speed = !isGrounded ? airMovementSpeed : isSprinting ? sprintSpeed : walkSpeed;
 			rigidbody.AddForce(camera.right * (inputVector.x * Time.deltaTime * speed), ForceMode.VelocityChange);
 			rigidbody.AddForce(camera.forward * (inputVector.y * Time.deltaTime * speed), ForceMode.VelocityChange);
-		}
-
-		private void ApplyResistance()
-		{
-			// Check if the object is moving downward (y component of velocity is negative)
-			if (!(rigidbody.velocity.y < 0)) return;
-			
-			// Calculate the resistance force direction (opposite to the current velocity)
-			var resistanceDirection = -rigidbody.velocity.normalized;
-
-			// Calculate the magnitude of the resistance force using a quadratic function
-			var speed = rigidbody.velocity.magnitude;
-			var resistanceMagnitude = speed * speed; // Change this formula to adjust the strength of the resistance force
-
-			// Apply the resistance force to the Rigidbody
-			rigidbody.AddForce(resistanceDirection * resistanceMagnitude, ForceMode.Force);
 		}
 
 		void CastCenterRay(int index, Vector3 direction)
