@@ -209,8 +209,17 @@ namespace MagicTerrain_V2
 				}
 				if (isNeighbourChunkAlreadyQueued)
 				{
-					chunkEditJobData.GetCirclePointsJob.points.Dispose();
 					circleNodeToRemove.Add(node);
+					chunkEditJobData.GetCirclePointsJob.points.Dispose();
+					node.IsProccessing = false;
+					continue;
+				}
+
+				if (neighbourChunks.Any(chunk => chunk.Chunk.LocalTerrainMap == null))
+				{
+					circleNodeToRemove.Add(node);
+					chunkEditJobData.GetCirclePointsJob.points.Dispose();
+					node.IsProccessing = false;
 					continue;
 				}
 
@@ -218,14 +227,7 @@ namespace MagicTerrain_V2
 				this.editedNodePointValues.Clear();
 				this.editedNodePointValues.AddRange(editedNodePointValues);
 				editedNodePointValuePosition = node.Position;
-				
-				if (neighbourChunks.Any(chunk => chunk.Chunk.LocalTerrainMap == null))
-				{
-					chunkEditJobData.GetCirclePointsJob.points.Dispose();
-					circleNodeToRemove.Add(node);
-					continue;
-				}
-				
+
 				foreach (var neighbourNode in neighbourChunks)
 				{
 					var diferenceInPosition = node.Position - neighbourNode.Position;
