@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace MagicTerrain_V2
@@ -46,7 +45,7 @@ namespace MagicTerrain_V2
 			scrollWheelDown.performed += ScrollWheelPerformedDown;
 		}
 
-		private void Update()
+		private void FixedUpdate()
 		{
 			if (editDelay >= 0)
 			{
