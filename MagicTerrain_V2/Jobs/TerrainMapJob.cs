@@ -69,31 +69,37 @@ namespace MagicTerrain_V2.Jobs
 				var xPos = chunkPosition.x + index;
 				var yPos = chunkPosition.y + y;
 				var zPos = chunkPosition.z + z;
+
 				var noiseValue = FastNoiseLite.GetNoise(
-					xPos * 1.5f + 0.01f,
-					zPos * 1.5f + 0.01f,
-					yPos * 1.5f + 0.01f,
+					xPos * 1.5f,
+					zPos * 1.5f,
+					yPos * 1.5f,
 					seed,
 					octaves,
 					weightedStrength,
 					lacunarity,
 					gain);
-				//warp the planets coordinates to get hills and wobbles
+				
+				// warp the planets coordinates to get hills and wobbles
 				FastNoiseLite.DomainWarp(ref xPos, ref yPos, ref zPos, seed, octaves, lacunarity, gain,
 					domainWarpAmp);
+				
+				var distance = Vector3.Distance(new Vector3(xPos, yPos, zPos), planetCenter);
+				var planetFill = Mathf.Clamp01(distance / planetSize);
+				
+				var t = 1f - Mathf.Exp(-0.3f * (distance - (planetSize)));
+
 				var caveNoiseValue = FastNoiseLite.GetNoise(
-					xPos * 0.4f + 0.01f,
-					zPos * 0.4f + 0.01f,
-					yPos * 0.4f + 0.01f,
+					xPos * 1.5f,
+					zPos * 1.5f,
+					yPos * 1.5f,
 					seed,
 					octavesCaves,
 					weightedStrengthCaves,
 					lacunarityCaves,
 					gainCaves);
-
-				var distance = Vector3.Distance(new Vector3(xPos, yPos, zPos), planetCenter);
-				var t = 1f - Mathf.Exp(-0.3f * (distance - planetSize));
-				var value = Mathf.Lerp(caveNoiseValue > 0.47f ? caveNoiseValue : noiseValue, 1f, t);
+				
+				var value = Mathf.Lerp(caveNoiseValue > 0.4f ? caveNoiseValue : noiseValue, 1f, t);
 				terrainMap[index + chunkSize * (y + chunkSize * z)] = value;
 			}
 		}
