@@ -55,14 +55,15 @@ namespace MagicTerrain_V2.Movment
 		private bool isMoving;
 		private bool isSprinting;
 		private bool isGrounded;
-		private bool isOnSlope;
+		private bool pastMaxSlopeAngle;
 		private GroundedRayData[] groundedRays;
+		private int groundedRaysCount;
 
-		public class GroundedRayData
+		private class GroundedRayData
 		{
 			public bool IsGrounded { get; set; }
 			public float Angle { get; set; }
-			public Vector3 position { get; set; }
+			public Vector3 SurfaceNormal { get; set; }
 		}
 
 		private void Awake()
@@ -103,7 +104,7 @@ namespace MagicTerrain_V2.Movment
 
 		private void PerformedJump(InputAction.CallbackContext context)
 		{
-			if (!isGrounded || isOnSlope) return;
+			if (!isGrounded || pastMaxSlopeAngle) return;
 			rigidbody.AddForce(transform.up * jumpStrength, ForceMode.VelocityChange);
 		}
 
@@ -150,14 +151,11 @@ namespace MagicTerrain_V2.Movment
 				CastRay(angle, i + 1, -transform.up);
 				angle += increment;
 			}
-
-			var groundedRaysCount = groundedRays.Count(groundedRay => groundedRay.IsGrounded);
+			
+			groundedRaysCount = groundedRays.Count(groundedRay => groundedRay.IsGrounded);
 			isGrounded = groundedRaysCount > 1;
-			IsAffectedByGravity = !isGrounded;
-			
-			var averageAngle = groundedRays.Where(data => data.IsGrounded).Sum(data => data.Angle) / groundedRaysCount;
-			isOnSlope = averageAngle >= maxSlopeAngle;
-			
+			// IsAffectedByGravity = !isGrounded;
+
 			if (groundedRaysCount < 7)
 			{
 				//gonna say is standing on an edge
@@ -167,31 +165,13 @@ namespace MagicTerrain_V2.Movment
 			var rotation = Quaternion.FromToRotation(transform.up, direction) * transform.rotation;
 			rigidbody.MoveRotation(rotation);
 			
-			// Apply gravity
-			 // if (!isGrounded)
-			 // {
-				//  rigidbody.AddForce(-transform.up * Time.deltaTime * gravityStrength, ForceMode.VelocityChange);
-			 // }
+			var averageAngle = groundedRays.Where(data => data.IsGrounded).Sum(data => data.Angle) / groundedRaysCount;
+			pastMaxSlopeAngle = averageAngle >= maxSlopeAngle;
 			 
-			 if (!isOnSlope)
+			 if (!pastMaxSlopeAngle)
 			 {
 				 PerformedMovement();
-				 
-				 // if (groundedRaysCount > 10)
-				 // {
-					//  var positions = groundedRays.Where(data => data.IsGrounded);
-					//  var totalPositions = positions.Aggregate(Vector3.zero, (current, position) => current + (position.position + Vector3.up));
-					//  var averagePosition = totalPositions / groundedRaysCount;
-					//  transform.position = averagePosition;
-				 // }
 			 }
-
-			 //decelerate the player
-			 // if (!isMoving)
-			 // {
-				//  rigidbody.velocity = Vector3.Lerp(rigidbody.velocity, Vector3.zero,
-				// 	 (isGrounded ? deceleration : airDeceleration) * Time.fixedDeltaTime);
-			 // }
 
 			 ClampRigidbodyVelocity();
 		}
@@ -203,11 +183,20 @@ namespace MagicTerrain_V2.Movment
 		
 		private void PerformedMovement()
 		{
+			var surfaceNormal = groundedRays[0].SurfaceNormal;
+
 			var inputVector = moveAction.ReadValue<Vector2>();
 			isMoving = inputVector.x > 0 || inputVector.y > 0;
 			var speed = !isGrounded ? airMovementSpeed : isSprinting ? sprintSpeed : walkSpeed;
-			rigidbody.AddForce(camera.right * (inputVector.x * Time.deltaTime * speed), ForceMode.VelocityChange);
-			rigidbody.AddForce(camera.forward * (inputVector.y * Time.deltaTime * speed), ForceMode.VelocityChange);
+			
+			var inputVectorX = transform.right * inputVector.x;
+			var inputVectorY = transform.forward * inputVector.y;
+			var direction = (inputVectorX + inputVectorY) / 2;
+
+
+			var movementDirection = Vector3.ProjectOnPlane(direction, surfaceNormal);
+			
+			rigidbody.AddForce((isGrounded ? movementDirection : direction) * speed, ForceMode.VelocityChange);
 		}
 
 		void CastCenterRay(int index, Vector3 direction)
@@ -237,13 +226,13 @@ namespace MagicTerrain_V2.Movment
 
 				// Get the angle between the surface normal and the player's up direction
 				groundedRays[index].Angle = Vector3.Angle(transform.up, hitNormal);
-				groundedRays[index].position = hit.point;
+				groundedRays[index].SurfaceNormal = hit.normal;
 				return;
 			}
 
 			groundedRays[index].IsGrounded = false;
 			groundedRays[index].Angle = 0;
-			groundedRays[index].position = Vector3.zero;
+			groundedRays[index].SurfaceNormal = Vector3.zero;
 		}
 	}
 }
