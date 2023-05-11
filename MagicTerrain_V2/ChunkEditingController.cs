@@ -70,6 +70,8 @@ namespace MagicTerrain_V2
 			{
 				sphere.SetActive(true);
 				sphere.transform.position = hit.point;
+				Vector3 forward = Vector3.Cross(-hit.normal, transform.right);
+				sphere.transform.rotation = Quaternion.LookRotation(forward);
 			}
 			else
 			{
