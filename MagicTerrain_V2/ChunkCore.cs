@@ -1,6 +1,7 @@
 using MagicTerrain_V2.Gravity;
 using MagicTerrain_V2.Helpers;
 using MagicTerrain_V2.Jobs;
+using MagicTerrain_V2.Saving;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
@@ -15,10 +16,13 @@ namespace MagicTerrain_V2
 		public bool DebugMode { get; set; }
 
 		[SerializeField]
-		private int chunkSize = 32;
+		private int chunkSize = 20;
 
 		[SerializeField]
 		private float worldSize = 10;
+		
+		[SerializeField]
+		private int chunkSetSize = 10;
 
 		[SerializeField]
 		private int viewDistance = 2;
@@ -106,8 +110,6 @@ namespace MagicTerrain_V2
 
 		private readonly List<ChunkContainer> chunkContainers = new();
 
-		private readonly Dictionary<Vector3Int, Chunk> registeredChunks = new();
-
 		private int terrainMapSize;
 
 		private float TrueWorldSize => worldSize * chunkSize;
@@ -126,6 +128,28 @@ namespace MagicTerrain_V2
 		private int trueIgnoreCullDistance;
 		
 		private int trueViewDistance;
+		
+		private void OnDrawGizmos()
+		{
+			if (!DebugMode) return;
+
+			editedNodePointValues.ForEach(editedNodePointValue =>
+			{
+				Gizmos.color = Color.red;
+				Gizmos.DrawSphere(editedNodePointValuePosition + editedNodePointValue.PointPosition, 0.1f);
+			});
+		}
+
+		//probably wont to move this somewhere else later on
+		private void Awake()
+		{
+			ChunkSetSaveLoadSystem.InitializeChunkSetSaveLoadSystem(chunkSetSize * chunkSize);
+			var roundVectorDownToNearestChunkSet = ChunkSetSaveLoadSystem.RoundVectorDownToNearestChunkSet(playerTransform.position);
+			if (!ChunkSetSaveLoadSystem.TryLoadChunkSet(roundVectorDownToNearestChunkSet))
+			{
+				Debug.LogError($"Failed to load ChunkSet at {roundVectorDownToNearestChunkSet}");
+			}
+		}
 
 		private void Start()
 		{
@@ -152,17 +176,6 @@ namespace MagicTerrain_V2
 			ManageQueues();
 
 			CalculateVisibleNodes();
-		}
-
-		private void OnDrawGizmos()
-		{
-			if (!DebugMode) return;
-
-			editedNodePointValues.ForEach(editedNodePointValue =>
-			{
-				Gizmos.color = Color.red;
-				Gizmos.DrawSphere(editedNodePointValuePosition + editedNodePointValue.PointPosition, 0.1f);
-			});
 		}
 
 		private void ManageQueues()
@@ -476,6 +489,7 @@ namespace MagicTerrain_V2
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
 			if (distance >= updateDistance || forceUpdate)
 			{
+				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(playerPosition);
 				planetRotationLastUpdate = transform.rotation;
 				lastPlayerPosition = playerPosition;
 				forceUpdate = false;
@@ -507,8 +521,7 @@ namespace MagicTerrain_V2
 					if (!nodes.ContainsKey(position))
 					{
 						var chunkPosition = new Vector3Int(x, y, z);
-						nodes.Add(position,
-							new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
+						nodes.Add(position, new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
 					}
 					else
 					{
@@ -559,10 +572,11 @@ namespace MagicTerrain_V2
 
 		private Chunk RequestChunk(Vector3Int position)
 		{
-			if (registeredChunks.TryGetValue(position, out var foundChunk)) return foundChunk;
+			if (ChunkSetSaveLoadSystem.TryGetChunk(position, out var foundChunk)) return foundChunk;
 
 			var requestedChunk = new Chunk();
-			registeredChunks.Add(position, requestedChunk);
+			ChunkSetSaveLoadSystem.AddChunkToChunkSet(position, requestedChunk);
+
 			return requestedChunk;
 		}
 
