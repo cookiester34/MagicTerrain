@@ -489,7 +489,7 @@ namespace MagicTerrain_V2
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
 			if (distance >= updateDistance || forceUpdate)
 			{
-				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(playerPosition);
+				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(playerPosition, trueViewDistance);
 				planetRotationLastUpdate = transform.rotation;
 				lastPlayerPosition = playerPosition;
 				forceUpdate = false;
@@ -598,6 +598,27 @@ namespace MagicTerrain_V2
 				{
 					queuedNodes.Add(node);
 				}
+				else if (chunk is {IsDirty: true})
+				{
+					var meshDataJob = new MeshDataJob
+					{
+						chunkSize = chunkSize + 1,
+						terrainMap = new NativeArray<float>(chunk.LocalTerrainMap, Allocator.Persistent),
+						terrainSurface = 0.5f,
+						vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
+						triangles = new NativeArray<int>(900000, Allocator.Persistent),
+						cube = new NativeArray<float>(8, Allocator.Persistent),
+						smoothTerrain = smoothTerrain,
+						flatShaded = !smoothTerrain || flatShaded,
+						triCount = new NativeArray<int>(1, Allocator.Persistent),
+						vertCount = new NativeArray<int>(1, Allocator.Persistent)
+					};
+					var meshDataJobHandle = meshDataJob.Schedule();
+
+					JobHandle.ScheduleBatchedJobs();
+					queuedNodesCheckChunkJobCompletion.Add(node, new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
+					chunk.IsDirty = false;
+				}
 				else if (chunk != null)
 				{
 					foundContainer.CreateChunkMesh(coreMaterial);
@@ -615,6 +636,27 @@ namespace MagicTerrain_V2
 			if (chunk is { Hasdata: false })
 			{
 				queuedNodes.Add(node);
+			}
+			else if (chunk is {IsDirty: true})
+			{
+				var meshDataJob = new MeshDataJob
+				{
+					chunkSize = chunkSize + 1,
+					terrainMap = new NativeArray<float>(chunk.LocalTerrainMap, Allocator.Persistent),
+					terrainSurface = 0.5f,
+					vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
+					triangles = new NativeArray<int>(900000, Allocator.Persistent),
+					cube = new NativeArray<float>(8, Allocator.Persistent),
+					smoothTerrain = smoothTerrain,
+					flatShaded = !smoothTerrain || flatShaded,
+					triCount = new NativeArray<int>(1, Allocator.Persistent),
+					vertCount = new NativeArray<int>(1, Allocator.Persistent)
+				};
+				var meshDataJobHandle = meshDataJob.Schedule();
+
+				JobHandle.ScheduleBatchedJobs();
+				queuedNodesCheckChunkJobCompletion.Add(node, new ChunkMarchChunkJobData(meshDataJobHandle, meshDataJob));
+				chunk.IsDirty = false;
 			}
 			else if (chunk != null)
 			{

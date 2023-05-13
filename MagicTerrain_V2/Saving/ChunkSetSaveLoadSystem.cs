@@ -70,9 +70,9 @@ public static class ChunkSetSaveLoadSystem
 		return new Vector3Int(x, y, z);
 	}
 	
-	public static void SaveOutOfRangeChunkSets(Vector3 playerPosition)
+	public static void SaveOutOfRangeChunkSets(Vector3 playerPosition, float viewDistance)
 	{
-		var range = chunkSetSize * 2;
+		var range = viewDistance * 1.5f;
 		List<Vector3Int> keysToRemove = new();
 		foreach (var (key, chunkSet) in ChunkSets)
 		{
@@ -96,7 +96,7 @@ public static class ChunkSetSaveLoadSystem
 	
 	public static bool TryLoadChunkSet(Vector3Int chunkSetPosition)
 	{
-		var savePath = Path.Combine(Application.persistentDataPath, $"{chunkSetPosition}.mtcs");
+		var savePath = Path.Combine(savePathDirectory, $"{chunkSetPosition}.mtcs");
 		if (!File.Exists(savePath))
 		{
 			Debug.Log($"No file found at {savePath}, Creating new ChunkSet");
@@ -106,8 +106,9 @@ public static class ChunkSetSaveLoadSystem
 			return false;
 		}
 		var file = File.Open(savePath, FileMode.Open);
-		var formatter = new BinaryFormatter();
+		var formatter = BinaryFormatter;
 		var chunkSet = (ChunkSet) formatter.Deserialize(file);
+		chunkSet.MarkChunksAsDirty();
 		if (!ChunkSets.TryAdd(chunkSetPosition, chunkSet))
 		{
 			Debug.LogError($"chunkset already exists at {chunkSetPosition}");
@@ -115,6 +116,7 @@ public static class ChunkSetSaveLoadSystem
 			return false;
 		}
 		file.Close();
+		Debug.Log($"Loaded chunkset at {chunkSetPosition}");
 		return true;
 	}
 	
@@ -137,7 +139,7 @@ public static class ChunkSetSaveLoadSystem
 					vector3SS);
 			}
 				
-			{ // Vector3
+			{ // Vector3Int
 				Vector3IntSerializationSurrogate vector3IntSS = new Vector3IntSerializationSurrogate();
 				surrogateSelector.AddSurrogate(
 					typeof(Vector3Int),

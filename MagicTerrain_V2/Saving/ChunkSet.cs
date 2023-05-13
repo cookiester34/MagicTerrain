@@ -25,8 +25,17 @@ namespace MagicTerrain_V2.Saving
 			data = new();
 		}
 
+		public void MarkChunksAsDirty()
+		{
+			foreach (var (_, chunk) in Chunks)
+			{
+				chunk.IsDirty = true;
+			}
+		}
+
 		public void OnBeforeSerialize()
 		{
+			Debug.Log("Serializing	");
 			keys.Clear();
 			data.Clear();
 			foreach (var chunk in Chunks)
