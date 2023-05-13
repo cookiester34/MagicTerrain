@@ -2,6 +2,7 @@ using MagicTerrain_V2.Gravity;
 using MagicTerrain_V2.Helpers;
 using MagicTerrain_V2.Jobs;
 using MagicTerrain_V2.Saving;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
@@ -93,6 +94,8 @@ namespace MagicTerrain_V2
 		private bool forceUpdate = true;
 
 		private Vector3 lastPlayerPosition;
+		
+		private Vector3 lastChunkSavePosition;
 
 		private int queueUpdateCount;
 
@@ -140,6 +143,11 @@ namespace MagicTerrain_V2
 			});
 		}
 
+		private void OnApplicationQuit()
+		{
+			ChunkSetSaveLoadSystem.SaveAllChunkSets();
+		}
+
 		//probably wont to move this somewhere else later on
 		private void Awake()
 		{
@@ -155,6 +163,7 @@ namespace MagicTerrain_V2
 		{
 			base.Start();
 			lastPlayerPosition = playerTransform.position;
+			lastChunkSavePosition = playerTransform.position;
 			trueIgnoreCullDistance = ignoreFrustrumCullDistance * chunkSize;
 			trueViewDistance = viewDistance * chunkSize;
 
@@ -176,6 +185,14 @@ namespace MagicTerrain_V2
 			ManageQueues();
 
 			CalculateVisibleNodes();
+
+			var playerTransformPosition = playerTransform.position;
+			var distance = Vector3.Distance(playerTransformPosition, lastChunkSavePosition);
+			if (distance <= viewDistance)
+			{
+				lastChunkSavePosition = playerTransformPosition;
+				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(lastPlayerPosition, trueViewDistance);
+			}
 		}
 
 		private void ManageQueues()
@@ -285,6 +302,7 @@ namespace MagicTerrain_V2
 				var wasEdited = editTerrainMapJobData.EditTerrainMapJob.wasEdited[0];
 				if (wasEdited)
 				{
+					node.Chunk.wasEdited = true;
 					node.Chunk.LocalTerrainMap = editTerrainMapJobData.EditTerrainMapJob.terrainMap.ToArray();
 
 					var meshDataJob = new MeshDataJob
@@ -489,7 +507,6 @@ namespace MagicTerrain_V2
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
 			if (distance >= updateDistance || forceUpdate)
 			{
-				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(playerPosition, trueViewDistance);
 				planetRotationLastUpdate = transform.rotation;
 				lastPlayerPosition = playerPosition;
 				forceUpdate = false;

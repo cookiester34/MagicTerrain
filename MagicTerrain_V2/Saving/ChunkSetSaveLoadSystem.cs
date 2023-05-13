@@ -78,6 +78,10 @@ public static class ChunkSetSaveLoadSystem
 		{
 			var distance = Vector3.Distance(playerPosition, key);
 			if (distance <= range) continue;
+			foreach (var (_, chunk) in chunkSet.Chunks)
+			{
+				chunk.CompressChunkData();
+			}
 			
 			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
 			var file = File.Create(savePath);
@@ -92,6 +96,25 @@ public static class ChunkSetSaveLoadSystem
 		{
 			ChunkSets.Remove(key);
 		}
+	}
+
+	public static void SaveAllChunkSets()
+	{
+		foreach (var (_, chunkSet) in ChunkSets)
+		{
+			foreach (var (_, chunk) in chunkSet.Chunks)
+			{
+				chunk.CompressChunkData();
+			}
+			
+			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
+			var file = File.Create(savePath);
+			var formatter = BinaryFormatter;
+			formatter.Serialize(file, chunkSet);
+			file.Close();
+		}
+
+		ChunkSets.Clear();
 	}
 	
 	public static bool TryLoadChunkSet(Vector3Int chunkSetPosition)
@@ -108,6 +131,10 @@ public static class ChunkSetSaveLoadSystem
 		var file = File.Open(savePath, FileMode.Open);
 		var formatter = BinaryFormatter;
 		var chunkSet = (ChunkSet) formatter.Deserialize(file);
+		foreach (var (_, chunk) in chunkSet.Chunks)
+		{
+			chunk.UncompressChunkData();
+		}
 		chunkSet.MarkChunksAsDirty();
 		if (!ChunkSets.TryAdd(chunkSetPosition, chunkSet))
 		{
