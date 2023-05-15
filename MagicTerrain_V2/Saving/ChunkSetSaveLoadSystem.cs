@@ -2,6 +2,7 @@ using MagicTerrain_V2;
 using MagicTerrain_V2.Saving;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
@@ -13,7 +14,7 @@ public static class ChunkSetSaveLoadSystem
 	private static int chunkSetSize = 100;
 
 	private static string savePathDirectory = Path.Combine(Application.dataPath, "MagicTerrainTestSaves");
-	
+
 	public static void InitializeChunkSetSaveLoadSystem(int size)
 	{
 		chunkSetSize = size;
@@ -61,7 +62,7 @@ public static class ChunkSetSaveLoadSystem
 		chunk = null;
 		return false;
 	}
-	
+
 	public static Vector3Int RoundVectorDownToNearestChunkSet(Vector3 position)
 	{
 		var x = Mathf.FloorToInt(position.x / chunkSetSize) * chunkSetSize;
@@ -69,7 +70,7 @@ public static class ChunkSetSaveLoadSystem
 		var z = Mathf.FloorToInt(position.z / chunkSetSize) * chunkSetSize;
 		return new Vector3Int(x, y, z);
 	}
-	
+
 	public static void SaveOutOfRangeChunkSets(Vector3 playerPosition, float viewDistance)
 	{
 		var range = viewDistance * 1.5f;
@@ -78,17 +79,25 @@ public static class ChunkSetSaveLoadSystem
 		{
 			var distance = Vector3.Distance(playerPosition, key);
 			if (distance <= range) continue;
+
+			//Remove all chunks not edited
+			var nonEditedChunks = chunkSet.Chunks.Where(chunk => !chunk.Value.WasEdited).ToArray();
+			foreach (var (chunkKey, _) in nonEditedChunks)
+			{
+				chunkSet.Chunks.Remove(chunkKey);
+			}
+
 			foreach (var (_, chunk) in chunkSet.Chunks)
 			{
 				chunk.CompressChunkData();
 			}
-			
+
 			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
 			var file = File.Create(savePath);
 			var formatter = BinaryFormatter;
 			formatter.Serialize(file, chunkSet);
 			file.Close();
-				
+
 			keysToRemove.Add(key);
 		}
 
@@ -106,7 +115,7 @@ public static class ChunkSetSaveLoadSystem
 			{
 				chunk.CompressChunkData();
 			}
-			
+
 			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
 			var file = File.Create(savePath);
 			var formatter = BinaryFormatter;
@@ -116,7 +125,7 @@ public static class ChunkSetSaveLoadSystem
 
 		ChunkSets.Clear();
 	}
-	
+
 	public static bool TryLoadChunkSet(Vector3Int chunkSetPosition)
 	{
 		var savePath = Path.Combine(savePathDirectory, $"{chunkSetPosition}.mtcs");
@@ -146,18 +155,18 @@ public static class ChunkSetSaveLoadSystem
 		Debug.Log($"Loaded chunkset at {chunkSetPosition}");
 		return true;
 	}
-	
+
 	private static BinaryFormatter binaryFormatter;
 	private static BinaryFormatter BinaryFormatter
 	{
 		get
 		{
 			if (binaryFormatter != null) return binaryFormatter;
-			
+
 			binaryFormatter = new BinaryFormatter();
- 
+
 			var surrogateSelector = new SurrogateSelector();
- 
+
 			{ // Vector3
 				Vector3SerializationSurrogate vector3SS = new Vector3SerializationSurrogate();
 				surrogateSelector.AddSurrogate(
@@ -165,7 +174,7 @@ public static class ChunkSetSaveLoadSystem
 					new StreamingContext(StreamingContextStates.All),
 					vector3SS);
 			}
-				
+
 			{ // Vector3Int
 				Vector3IntSerializationSurrogate vector3IntSS = new Vector3IntSerializationSurrogate();
 				surrogateSelector.AddSurrogate(
@@ -173,7 +182,7 @@ public static class ChunkSetSaveLoadSystem
 					new StreamingContext(StreamingContextStates.All),
 					vector3IntSS);
 			}
- 
+
 			binaryFormatter.SurrogateSelector = surrogateSelector;
 
 			return binaryFormatter;

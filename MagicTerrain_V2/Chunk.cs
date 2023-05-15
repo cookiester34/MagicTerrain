@@ -1,4 +1,6 @@
-﻿using System;
+﻿using MagicTerrain_V2.Saving;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using UnityEngine;
@@ -8,6 +10,8 @@ namespace MagicTerrain_V2
 	[Serializable]
 	public class Chunk
 	{
+		[field:NonSerialized]
+		public int chunkSize { get;  set; }
 		[field:NonSerialized]
 		public float[] LocalTerrainMap { get;  set; }
 		[field:NonSerialized]
@@ -19,10 +23,15 @@ namespace MagicTerrain_V2
 		[field:NonSerialized]
 		public bool IsDirty { get; set; }
 		[field:NonSerialized]
-		public bool wasEdited { get; set; }
-		
+		public bool WasEdited { get; set; }
+
+
+		//this is the only data that will get saved
+		public List<float> editedValues { get; set; } = new();
+		public List<int> editedTerrainMapIndexs { get; set; } = new();
+
 		public bool Hasdata => LocalTerrainMap != null;
-		
+
 		private byte[] compressedTerrainMapBytes;
 
 		public void BuildMesh()
@@ -34,12 +43,30 @@ namespace MagicTerrain_V2
 			Meshes[0].RecalculateNormals();
 		}
 
+		public void AddChunkEdit(List<Vector3Int> points, Vector3Int diferenceInPosition)
+		{
+			foreach (var pointPosition in points)
+			{
+				//get the point relative to this chunk
+				var relativePosition = pointPosition + diferenceInPosition;
+
+				//check if the point is within the chunk
+				if (relativePosition.x < 0 || relativePosition.y < 0 || relativePosition.z < 0
+				    || relativePosition.x >= chunkSize || relativePosition.y >= chunkSize || relativePosition.z >= chunkSize) return;
+
+				var terrainMapIndex = relativePosition.x + chunkSize * (relativePosition.y + chunkSize * relativePosition.z);
+
+				editedValues.Add(LocalTerrainMap[terrainMapIndex]);
+				editedTerrainMapIndexs.Add(terrainMapIndex);
+			}
+		}
+
 		public void CompressChunkData()
 		{
-			if (LocalTerrainMap == null || !wasEdited) return;
-			
-			var localTerrainMapBytes = new byte[LocalTerrainMap.Length * sizeof(float)];
-			Buffer.BlockCopy(LocalTerrainMap, 0, localTerrainMapBytes, 0, localTerrainMapBytes.Length);
+			if (EditedPoints == null) return; //editedValues
+
+			var localTerrainMapBytes = new byte[EditedPoints.Count * 8];
+			Buffer.BlockCopy(EditedPoints.ToArray(), 0, localTerrainMapBytes, 0, localTerrainMapBytes.Length);
 
 			// Compress the byte array using gzip
 			using (var ms = new MemoryStream())
@@ -55,7 +82,7 @@ namespace MagicTerrain_V2
 		public void UncompressChunkData()
 		{
 			if (compressedTerrainMapBytes == null) return;
-			
+
 			byte[] decompressedBytes;
 			using (var ms = new MemoryStream(compressedTerrainMapBytes))
 			{
@@ -68,10 +95,18 @@ namespace MagicTerrain_V2
 					}
 				}
 			}
-			
+
 			// Convert the decompressed byte array back to a float array
-			LocalTerrainMap = new float[decompressedBytes.Length / sizeof(float)];
-			Buffer.BlockCopy(decompressedBytes, 0, LocalTerrainMap, 0, decompressedBytes.Length);
+			var editedPoints = new ChunkEditData[decompressedBytes.Length / 8];
+			Buffer.BlockCopy(decompressedBytes, 0, editedPoints, 0, decompressedBytes.Length);
+
+			foreach (var editData in editedPoints)
+			{
+				LocalTerrainMap[editData.ArrayPosition] = editData.Value;
+			}
+
+			WasEdited = true;
+			EditedPoints.AddRange(editedPoints);
 		}
 	}
 }

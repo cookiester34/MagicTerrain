@@ -21,13 +21,13 @@ namespace MagicTerrain_V2
 
 		[SerializeField]
 		private float worldSize = 10;
-		
+
 		[SerializeField]
 		private int chunkSetSize = 10;
 
 		[SerializeField]
 		private int viewDistance = 2;
-		
+
 		[SerializeField]
 		private int ignoreFrustrumCullDistance = 2;
 
@@ -94,7 +94,7 @@ namespace MagicTerrain_V2
 		private bool forceUpdate = true;
 
 		private Vector3 lastPlayerPosition;
-		
+
 		private Vector3 lastChunkSavePosition;
 
 		private int queueUpdateCount;
@@ -118,20 +118,20 @@ namespace MagicTerrain_V2
 		private float TrueWorldSize => worldSize * chunkSize;
 
 		private HashSet<Vector3> VisiblePositions { get; } = new();
-		
+
 		private Quaternion planetRotationLastUpdate;
-		
+
 		//debug info
 		private Vector3 editedNodePointValuePosition;
-		
+
 		private List<EditedNodePointValue> editedNodePointValues = new();
-		
+
 		private Plane[] cameraPlanes;
 
 		private int trueIgnoreCullDistance;
-		
+
 		private int trueViewDistance;
-		
+
 		private void OnDrawGizmos()
 		{
 			if (!DebugMode) return;
@@ -261,7 +261,7 @@ namespace MagicTerrain_V2
 				foreach (var neighbourNode in neighbourChunks)
 				{
 					var diferenceInPosition = node.Position - neighbourNode.Position;
-					
+
 						var terrainMapEditJob = new EditTerrainMapJob()
 					{
 						diferenceInPosition = diferenceInPosition,
@@ -273,11 +273,11 @@ namespace MagicTerrain_V2
 					};
 					var jobHandler = terrainMapEditJob.Schedule(editedNodePointValues.Length, 60);
 					JobHandle.ScheduleBatchedJobs();
-				
+
 					queuedNodesTerrainMapEdit.Add(neighbourNode, new EditTerrainMapJobData(jobHandler, terrainMapEditJob));
 					neighbourNode.IsProccessing = true;
 				}
-				
+
 				circleNodeToRemove.Add(node);
 				chunkEditJobData.GetCirclePointsJob.points.Dispose();
 			}
@@ -299,11 +299,20 @@ namespace MagicTerrain_V2
 
 				editTerrainMapJobData.EditTerrainMapJobHandle.Complete();
 
-				var wasEdited = editTerrainMapJobData.EditTerrainMapJob.wasEdited[0];
+				var editTerrainMapJob = editTerrainMapJobData.EditTerrainMapJob;
+				var wasEdited = editTerrainMapJob.wasEdited[0];
 				if (wasEdited)
 				{
-					node.Chunk.wasEdited = true;
-					node.Chunk.LocalTerrainMap = editTerrainMapJobData.EditTerrainMapJob.terrainMap.ToArray();
+					node.Chunk.WasEdited = true;
+					List<Vector3Int> editPositions = new();
+
+					foreach (var point in editTerrainMapJob.points)
+					{
+						editPositions.Add(point.PointPosition);
+					}
+
+					node.Chunk.AddChunkEdit(editPositions, editTerrainMapJob.diferenceInPosition);
+					node.Chunk.LocalTerrainMap = editTerrainMapJob.terrainMap.ToArray();
 
 					var meshDataJob = new MeshDataJob
 					{
@@ -328,8 +337,8 @@ namespace MagicTerrain_V2
 					node.IsProccessing = false;
 				}
 
-				editTerrainMapJobData.EditTerrainMapJob.wasEdited.Dispose();
-				editTerrainMapJobData.EditTerrainMapJob.terrainMap.Dispose();
+				editTerrainMapJob.wasEdited.Dispose();
+				editTerrainMapJob.terrainMap.Dispose();
 
 				terrainMapNodeToRemove.Add(node);
 			}
@@ -513,7 +522,7 @@ namespace MagicTerrain_V2
 
 				var lastVisibleNodes = VisiblePositions.ToList();
 				VisiblePositions.Clear();
-				
+
 				var trueWorldSize = TrueWorldSize * 1.5f;
 
 				for (var x = playerPosition.x - trueViewDistance;
@@ -534,7 +543,7 @@ namespace MagicTerrain_V2
 					var rotatedPosition = Matrix4x4.Rotate(planetRotationLastUpdate) *
 					                      transform.localToWorldMatrix.MultiplyPoint(position);
 					var realPosition = new Vector3(rotatedPosition.x, rotatedPosition.y, rotatedPosition.z);
-					
+
 					if (!nodes.ContainsKey(position))
 					{
 						var chunkPosition = new Vector3Int(x, y, z);
@@ -582,7 +591,7 @@ namespace MagicTerrain_V2
 						continue;
 					}
 				}
-				
+
 				node.EnableNode();
 			}
 		}
@@ -706,13 +715,13 @@ namespace MagicTerrain_V2
 			node.IsProccessing = true;
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
-			
+
 			if (arraySize <= 0)
 			{
 				node.IsProccessing = false;
 				return;
 			}
-			
+
 			hitPoint = transform.worldToLocalMatrix.MultiplyPoint(hitPoint);
 			hitPoint -= node.Position;
 
