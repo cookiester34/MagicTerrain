@@ -111,6 +111,13 @@ public static class ChunkSetSaveLoadSystem
 	{
 		foreach (var (_, chunkSet) in ChunkSets)
 		{
+			//Remove all chunks not edited
+			var nonEditedChunks = chunkSet.Chunks.Where(chunk => !chunk.Value.WasEdited).ToArray();
+			foreach (var (chunkKey, _) in nonEditedChunks)
+			{
+				chunkSet.Chunks.Remove(chunkKey);
+			}
+			
 			foreach (var (_, chunk) in chunkSet.Chunks)
 			{
 				chunk.CompressChunkData();
@@ -131,7 +138,6 @@ public static class ChunkSetSaveLoadSystem
 		var savePath = Path.Combine(savePathDirectory, $"{chunkSetPosition}.mtcs");
 		if (!File.Exists(savePath))
 		{
-			Debug.Log($"No file found at {savePath}, Creating new ChunkSet");
 			var newChunkSet = new ChunkSet(chunkSetPosition);
 			if (ChunkSets.TryAdd(chunkSetPosition, newChunkSet)) return true;
 			Debug.LogError($"chunkset already exists at {chunkSetPosition}");
@@ -152,7 +158,6 @@ public static class ChunkSetSaveLoadSystem
 			return false;
 		}
 		file.Close();
-		Debug.Log($"Loaded chunkset at {chunkSetPosition}");
 		return true;
 	}
 

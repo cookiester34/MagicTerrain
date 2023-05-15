@@ -11,8 +11,6 @@ namespace MagicTerrain_V2
 	public class Chunk
 	{
 		[field:NonSerialized]
-		public int chunkSize { get;  set; }
-		[field:NonSerialized]
 		public float[] LocalTerrainMap { get;  set; }
 		[field:NonSerialized]
 		public int[] ChunkTriangles { get;  set; }
@@ -24,15 +22,20 @@ namespace MagicTerrain_V2
 		public bool IsDirty { get; set; }
 		[field:NonSerialized]
 		public bool WasEdited { get; set; }
-
-
+		[field:NonSerialized]
+		public bool EditsHaveBeenApplied { get; set; }
+		
 		//this is the only data that will get saved
+		[field:NonSerialized]
 		public List<float> editedValues { get; set; } = new();
+		[field:NonSerialized]
 		public List<int> editedTerrainMapIndexs { get; set; } = new();
 
 		public bool Hasdata => LocalTerrainMap != null;
 
-		private byte[] compressedTerrainMapBytes;
+		public int chunkSize { get;  set; }
+		private byte[] compressedEditedValuesBytes;
+		private byte[] compressedTerrainMapIndicesBytes;
 
 		public void BuildMesh()
 		{
@@ -45,6 +48,7 @@ namespace MagicTerrain_V2
 
 		public void AddChunkEdit(List<Vector3Int> points, Vector3Int diferenceInPosition)
 		{
+			WasEdited = true;
 			foreach (var pointPosition in points)
 			{
 				//get the point relative to this chunk
@@ -63,50 +67,90 @@ namespace MagicTerrain_V2
 
 		public void CompressChunkData()
 		{
-			if (EditedPoints == null) return; //editedValues
+			if (editedValues == null) return; //editedValues
 
-			var localTerrainMapBytes = new byte[EditedPoints.Count * 8];
-			Buffer.BlockCopy(EditedPoints.ToArray(), 0, localTerrainMapBytes, 0, localTerrainMapBytes.Length);
+			var localTerrainMapValuesBytes = new byte[editedValues.Count * 4];
+			Buffer.BlockCopy(editedValues.ToArray(), 0, localTerrainMapValuesBytes, 0, localTerrainMapValuesBytes.Length);
 
 			// Compress the byte array using gzip
 			using (var ms = new MemoryStream())
 			{
 				using (var gzip = new GZipStream(ms, CompressionMode.Compress))
 				{
-					gzip.Write(localTerrainMapBytes, 0, localTerrainMapBytes.Length);
+					gzip.Write(localTerrainMapValuesBytes, 0, localTerrainMapValuesBytes.Length);
 				}
-				compressedTerrainMapBytes = ms.ToArray();
+				compressedEditedValuesBytes = ms.ToArray();
+			}
+
+			var localTerrainMapIndicesBytes = new byte[editedTerrainMapIndexs.Count * 4];
+			Buffer.BlockCopy(editedTerrainMapIndexs.ToArray(), 0, localTerrainMapIndicesBytes, 0, localTerrainMapIndicesBytes.Length);
+
+			// Compress the byte array using gzip
+			using (var ms = new MemoryStream())
+			{
+				using (var gzip = new GZipStream(ms, CompressionMode.Compress))
+				{
+					gzip.Write(localTerrainMapIndicesBytes, 0, localTerrainMapIndicesBytes.Length);
+				}
+				compressedTerrainMapIndicesBytes = ms.ToArray();
 			}
 		}
 
 		public void UncompressChunkData()
 		{
-			if (compressedTerrainMapBytes == null) return;
+			if (compressedEditedValuesBytes == null) return;
 
-			byte[] decompressedBytes;
-			using (var ms = new MemoryStream(compressedTerrainMapBytes))
+			byte[] decompressedEditedValuesBytes;
+			using (var ms = new MemoryStream(compressedEditedValuesBytes))
 			{
 				using (var gzip = new GZipStream(ms, CompressionMode.Decompress))
 				{
 					using (var output = new MemoryStream())
 					{
 						gzip.CopyTo(output);
-						decompressedBytes = output.ToArray();
+						decompressedEditedValuesBytes = output.ToArray();
 					}
 				}
 			}
-
 			// Convert the decompressed byte array back to a float array
-			var editedPoints = new ChunkEditData[decompressedBytes.Length / 8];
-			Buffer.BlockCopy(decompressedBytes, 0, editedPoints, 0, decompressedBytes.Length);
+			var editedPoints = new float[decompressedEditedValuesBytes.Length / 4];
+			Buffer.BlockCopy(decompressedEditedValuesBytes, 0, editedPoints, 0, decompressedEditedValuesBytes.Length);
 
-			foreach (var editData in editedPoints)
+			byte[] decompressedTerrainMapIndicesBytes;
+			using (var ms = new MemoryStream(compressedTerrainMapIndicesBytes))
 			{
-				LocalTerrainMap[editData.ArrayPosition] = editData.Value;
+				using (var gzip = new GZipStream(ms, CompressionMode.Decompress))
+				{
+					using (var output = new MemoryStream())
+					{
+						gzip.CopyTo(output);
+						decompressedTerrainMapIndicesBytes = output.ToArray();
+					}
+				}
 			}
+			// Convert the decompressed byte array back to a float array
+			var editedPointIndices = new int[decompressedTerrainMapIndicesBytes.Length / 4];
+			Buffer.BlockCopy(decompressedTerrainMapIndicesBytes, 0, editedPointIndices, 0, decompressedTerrainMapIndicesBytes.Length);
 
 			WasEdited = true;
-			EditedPoints.AddRange(editedPoints);
+			editedValues ??= new List<float>();
+			editedValues.AddRange(editedPoints);
+			editedTerrainMapIndexs ??= new List<int>();
+			editedTerrainMapIndexs.AddRange(editedPointIndices);
+		}
+		
+		public void ApplyChunkEdits()
+		{
+			if (editedValues == null || EditsHaveBeenApplied) return;
+			if (editedValues.Count > 0)
+			{
+				for (var i = 0; i < editedValues.Count; i++)
+				{
+					LocalTerrainMap[editedTerrainMapIndexs[i]] = editedValues[i];
+				}
+
+				EditsHaveBeenApplied = true;
+			}
 		}
 	}
 }

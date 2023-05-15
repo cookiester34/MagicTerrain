@@ -303,7 +303,6 @@ namespace MagicTerrain_V2
 				var wasEdited = editTerrainMapJob.wasEdited[0];
 				if (wasEdited)
 				{
-					node.Chunk.WasEdited = true;
 					List<Vector3Int> editPositions = new();
 
 					foreach (var point in editTerrainMapJob.points)
@@ -311,8 +310,8 @@ namespace MagicTerrain_V2
 						editPositions.Add(point.PointPosition);
 					}
 
-					node.Chunk.AddChunkEdit(editPositions, editTerrainMapJob.diferenceInPosition);
 					node.Chunk.LocalTerrainMap = editTerrainMapJob.terrainMap.ToArray();
+					node.Chunk.AddChunkEdit(editPositions, editTerrainMapJob.diferenceInPosition);
 
 					var meshDataJob = new MeshDataJob
 					{
@@ -416,6 +415,7 @@ namespace MagicTerrain_V2
 				creationQueueData.TerrainMapJobHandle.Complete();
 
 				node.Chunk.LocalTerrainMap = creationQueueData.TerrainMapJob.terrainMap.ToArray();
+				node.Chunk.ApplyChunkEdits();
 
 				var meshDataJob = new MeshDataJob
 				{
@@ -601,6 +601,7 @@ namespace MagicTerrain_V2
 			if (ChunkSetSaveLoadSystem.TryGetChunk(position, out var foundChunk)) return foundChunk;
 
 			var requestedChunk = new Chunk();
+			requestedChunk.chunkSize = chunkSize;
 			ChunkSetSaveLoadSystem.AddChunkToChunkSet(position, requestedChunk);
 
 			return requestedChunk;
