@@ -1,5 +1,7 @@
+using Ionic.Zlib;
 using MagicTerrain_V2;
 using MagicTerrain_V2.Saving;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -36,6 +38,7 @@ public static class ChunkSetSaveLoadSystem
 				return;
 			}
 		}
+
 		if (!ChunkSets[chunksetPosition].Chunks.TryAdd(chunkPosition, chunk))
 		{
 			Debug.LogError($"Failed to add chunk to chunk set at {chunksetPosition}, chunk already exists");
@@ -59,6 +62,7 @@ public static class ChunkSetSaveLoadSystem
 		{
 			return chunkSet.Chunks.TryGetValue(chunkPosition, out chunk);
 		}
+
 		chunk = null;
 		return false;
 	}
@@ -117,7 +121,7 @@ public static class ChunkSetSaveLoadSystem
 			{
 				chunkSet.Chunks.Remove(chunkKey);
 			}
-			
+
 			foreach (var (_, chunk) in chunkSet.Chunks)
 			{
 				chunk.CompressChunkData();
@@ -143,6 +147,7 @@ public static class ChunkSetSaveLoadSystem
 			Debug.LogError($"chunkset already exists at {chunkSetPosition}");
 			return false;
 		}
+
 		var file = File.Open(savePath, FileMode.Open);
 		var formatter = BinaryFormatter;
 		var chunkSet = (ChunkSet) formatter.Deserialize(file);
@@ -150,6 +155,7 @@ public static class ChunkSetSaveLoadSystem
 		{
 			chunk.UncompressChunkData();
 		}
+
 		chunkSet.MarkChunksAsDirty();
 		if (!ChunkSets.TryAdd(chunkSetPosition, chunkSet))
 		{
@@ -157,8 +163,50 @@ public static class ChunkSetSaveLoadSystem
 			file.Close();
 			return false;
 		}
+
 		file.Close();
 		return true;
+	}
+
+	public static byte[] Compress(this float[] array) => CompressNativeTypeArray(array, sizeof(float));
+	public static byte[] Compress(this int[] array) => CompressNativeTypeArray(array, sizeof(int));
+
+	private static byte[] CompressNativeTypeArray<T>(T[] array, int size)
+	{
+		var arrayBytes = new byte[array.Length * size];
+		Buffer.BlockCopy(array, 0, arrayBytes, 0, arrayBytes.Length);
+		// Compress the byte array using gzip
+		using var ms = new MemoryStream();
+		using (var gzip = new GZipStream(ms, CompressionMode.Compress))
+		{
+			gzip.Write(arrayBytes, 0, arrayBytes.Length);
+		}
+		var compressedEditedValuesBytes = ms.ToArray();
+
+		return compressedEditedValuesBytes;
+	}
+
+	public static float[] UncompressFloatArray (this byte[] array) => UncompressArray<float>(array, sizeof(float));
+	public static int[] UncompressIntArray (this byte[] array) => UncompressArray<int>(array, sizeof(int));
+
+	private static T[] UncompressArray<T>(byte[] byteArray, int size)
+	{
+		byte[] decompressedEditedValuesBytes;
+		using (var ms = new MemoryStream(byteArray))
+		{
+			using (var gzip = new GZipStream(ms, CompressionMode.Decompress))
+			{
+				using (var output = new MemoryStream())
+				{
+					gzip.CopyTo(output);
+					decompressedEditedValuesBytes = output.ToArray();
+				}
+			}
+		}
+		// Convert the decompressed byte array back to a float array
+		var editedPoints = new T[decompressedEditedValuesBytes.Length / size];
+		Buffer.BlockCopy(decompressedEditedValuesBytes, 0, editedPoints, 0, decompressedEditedValuesBytes.Length);
+		return editedPoints;
 	}
 
 	private static BinaryFormatter binaryFormatter;

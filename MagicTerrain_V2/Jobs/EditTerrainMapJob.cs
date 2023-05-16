@@ -19,12 +19,21 @@ namespace MagicTerrain_V2.Jobs
 
 		[ReadOnly]
 		public int chunkSize;
-		
+
 		[NativeDisableParallelForRestriction]
 		public NativeArray<bool> wasEdited;
 
 		[NativeDisableParallelForRestriction]
 		public NativeArray<float> terrainMap;
+
+		[NativeDisableParallelForRestriction]
+		public NativeArray<float> editedTerrainMapValues;
+
+		[NativeDisableParallelForRestriction]
+		public NativeArray<int> editedTerrainMapIndices;
+
+		[NativeDisableParallelForRestriction]
+		public NativeArray<int> arrayCount;
 
 		[BurstCompile]
 		public void Execute(int index)
@@ -35,17 +44,22 @@ namespace MagicTerrain_V2.Jobs
 
 			//check if the point is within the chunk
 			if (relativePosition.x < 0 || relativePosition.y < 0 || relativePosition.z < 0
-			    || relativePosition.x >= chunkSize || relativePosition.y >= chunkSize || relativePosition.z >= chunkSize) return; 
-				
+			    || relativePosition.x >= chunkSize || relativePosition.y >= chunkSize || relativePosition.z >= chunkSize) return;
+
 			var terrainMapIndex = relativePosition.x + chunkSize * (relativePosition.y + chunkSize * relativePosition.z);
 
 			var isWithinBounds = terrainMapIndex >= 0 && terrainMapIndex < terrainMap.Length;
 
 			if (!isWithinBounds) return;
-			
+
 			var pointValue = editedChunkPointValue.PointTValue;
 			var terrain = terrainMap[terrainMapIndex];
-			terrainMap[terrainMapIndex] = Mathf.Lerp(terrain, add ? 0 : 1, 0.04f * pointValue);
+			var lerpValue = Mathf.Lerp(terrain, add ? 0 : 1, 0.04f * pointValue);
+			terrainMap[terrainMapIndex] = lerpValue;
+
+			editedTerrainMapValues[arrayCount[0]] = lerpValue;
+			editedTerrainMapIndices[arrayCount[0]] = terrainMapIndex;
+			arrayCount[0]++;
 			wasEdited[0] = true;
 		}
 	}
