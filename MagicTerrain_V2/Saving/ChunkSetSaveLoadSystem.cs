@@ -4,9 +4,6 @@ using MagicTerrain_V2.Saving;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 
 public static class ChunkSetSaveLoadSystem
@@ -84,25 +81,13 @@ public static class ChunkSetSaveLoadSystem
 			var distance = Vector3.Distance(playerPosition, key);
 			if (distance <= range) continue;
 
-			//Remove all chunks not edited
-			var nonEditedChunks = chunkSet.Chunks.Where(chunk => !chunk.Value.WasEdited).ToArray();
-			foreach (var (chunkKey, _) in nonEditedChunks)
-			{
-				chunkSet.Chunks.Remove(chunkKey);
-			}
-
-			foreach (var (_, chunk) in chunkSet.Chunks)
-			{
-				chunk.CompressChunkData();
-			}
-
 			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
 			var file = File.Create(savePath);
-			var formatter = BinaryFormatter;
-			formatter.Serialize(file, chunkSet);
-			file.Close();
+			using var writer = new BinaryWriter(file);
+			chunkSet.Serialize(writer);
+			writer.Flush();
 
-			keysToRemove.Add(key);
+			file.Close();
 		}
 
 		foreach (var key in keysToRemove)
@@ -115,22 +100,12 @@ public static class ChunkSetSaveLoadSystem
 	{
 		foreach (var (_, chunkSet) in ChunkSets)
 		{
-			//Remove all chunks not edited
-			var nonEditedChunks = chunkSet.Chunks.Where(chunk => !chunk.Value.WasEdited).ToArray();
-			foreach (var (chunkKey, _) in nonEditedChunks)
-			{
-				chunkSet.Chunks.Remove(chunkKey);
-			}
-
-			foreach (var (_, chunk) in chunkSet.Chunks)
-			{
-				chunk.CompressChunkData();
-			}
-
 			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
 			var file = File.Create(savePath);
-			var formatter = BinaryFormatter;
-			formatter.Serialize(file, chunkSet);
+			using var writer = new BinaryWriter(file);
+			chunkSet.Serialize(writer);
+			writer.Flush();
+
 			file.Close();
 		}
 
@@ -140,22 +115,17 @@ public static class ChunkSetSaveLoadSystem
 	public static bool TryLoadChunkSet(Vector3Int chunkSetPosition)
 	{
 		var savePath = Path.Combine(savePathDirectory, $"{chunkSetPosition}.mtcs");
+		var chunkSet = new ChunkSet(chunkSetPosition);
 		if (!File.Exists(savePath))
 		{
-			var newChunkSet = new ChunkSet(chunkSetPosition);
-			if (ChunkSets.TryAdd(chunkSetPosition, newChunkSet)) return true;
+			if (ChunkSets.TryAdd(chunkSetPosition, chunkSet)) return true;
 			Debug.LogError($"chunkset already exists at {chunkSetPosition}");
 			return false;
 		}
 
 		var file = File.Open(savePath, FileMode.Open);
-		var formatter = BinaryFormatter;
-		var chunkSet = (ChunkSet) formatter.Deserialize(file);
-		foreach (var (_, chunk) in chunkSet.Chunks)
-		{
-			chunk.UncompressChunkData();
-		}
-
+		using var reader = new BinaryReader(file);
+		chunkSet.Deserialize(reader);
 		chunkSet.MarkChunksAsDirty();
 		if (!ChunkSets.TryAdd(chunkSetPosition, chunkSet))
 		{
@@ -207,38 +177,5 @@ public static class ChunkSetSaveLoadSystem
 		var editedPoints = new T[decompressedEditedValuesBytes.Length / size];
 		Buffer.BlockCopy(decompressedEditedValuesBytes, 0, editedPoints, 0, decompressedEditedValuesBytes.Length);
 		return editedPoints;
-	}
-
-	private static BinaryFormatter binaryFormatter;
-	private static BinaryFormatter BinaryFormatter
-	{
-		get
-		{
-			if (binaryFormatter != null) return binaryFormatter;
-
-			binaryFormatter = new BinaryFormatter();
-
-			var surrogateSelector = new SurrogateSelector();
-
-			{ // Vector3
-				Vector3SerializationSurrogate vector3SS = new Vector3SerializationSurrogate();
-				surrogateSelector.AddSurrogate(
-					typeof(Vector3),
-					new StreamingContext(StreamingContextStates.All),
-					vector3SS);
-			}
-
-			{ // Vector3Int
-				Vector3IntSerializationSurrogate vector3IntSS = new Vector3IntSerializationSurrogate();
-				surrogateSelector.AddSurrogate(
-					typeof(Vector3Int),
-					new StreamingContext(StreamingContextStates.All),
-					vector3IntSS);
-			}
-
-			binaryFormatter.SurrogateSelector = surrogateSelector;
-
-			return binaryFormatter;
-		}
 	}
 }

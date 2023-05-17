@@ -1,28 +1,24 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using UnityEngine;
 
 namespace MagicTerrain_V2.Saving
 {
 	[Serializable]
-	public struct ChunkSet : ISerializationCallbackReceiver
+	public struct ChunkSet
 	{
 		[SerializeField]
 		private Vector3Int chunkSetPosition;
 		public Vector3Int ChunkSetPosition => chunkSetPosition;
 
-		[SerializeField]
-		private List<Vector3Int> keys;
-		[SerializeField]
-		private List<Chunk> data;
 		public Dictionary<Vector3Int, Chunk> Chunks { get; }
 
 		public ChunkSet(Vector3Int chunkSetPosition)
 		{
 			Chunks = new();
 			this.chunkSetPosition = chunkSetPosition;
-			keys = new();
-			data = new();
 		}
 
 		public void MarkChunksAsDirty()
@@ -33,24 +29,48 @@ namespace MagicTerrain_V2.Saving
 			}
 		}
 
-		public void OnBeforeSerialize()
+		public void Serialize(BinaryWriter writer)
 		{
-			Debug.Log("Serializing	");
-			keys.Clear();
-			data.Clear();
-			foreach (var chunk in Chunks)
+			writer.Write(Chunks.Count);
+			foreach (var (key, chunk) in Chunks)
 			{
-				keys.Add(chunk.Key);
-				data.Add(chunk.Value);
+				// key
+				writer.Write(key.x);
+				writer.Write(key.y);
+				writer.Write(key.z);
+
+				// value
+				writer.Write((short)chunk.EditedPoints.Count);
+				foreach (var edit in chunk.EditedPoints)
+				{
+					writer.Write((short)edit.Key);
+					writer.Write(edit.Value);
+				}
 			}
 		}
 
-		public void OnAfterDeserialize()
+		public void Deserialize(BinaryReader reader)
 		{
-			Chunks.Clear();
-			for (int i = 0; i < keys.Count; i++)
+			var chunkCount = reader.ReadInt32();
+
+			for (int i = 0; i < chunkCount; i++)
 			{
-				Chunks.Add(keys[i], data[i]);
+				// key
+				var x = reader.ReadInt32();
+				var y = reader.ReadInt32();
+				var z = reader.ReadInt32();
+
+				var key = new Vector3Int(x, y, z);
+				var chunk = new Chunk();
+				Chunks.Add(key, chunk);
+
+				var editCount = (int)reader.ReadInt16();
+				for (int j = 0; j < editCount; j++)
+				{
+					var index = (int)reader.ReadInt16();
+					var value = reader.ReadSingle();
+					chunk.EditedPoints[index] = value;
+				}
 			}
 		}
 	}

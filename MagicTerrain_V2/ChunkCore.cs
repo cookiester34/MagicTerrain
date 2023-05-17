@@ -427,8 +427,7 @@ namespace MagicTerrain_V2
 				var meshDataJob = new MeshDataJob
 				{
 					chunkSize = chunkSize + 1,
-					terrainMap = new NativeArray<float>(node.ChunkContainer.Chunk.LocalTerrainMap,
-						Allocator.Persistent),
+					terrainMap = new NativeArray<float>(node.ChunkContainer.Chunk.LocalTerrainMap, Allocator.Persistent),
 					terrainSurface = 0.5f,
 					vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
 					triangles = new NativeArray<int>(900000, Allocator.Persistent),
