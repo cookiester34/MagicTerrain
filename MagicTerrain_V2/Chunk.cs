@@ -1,8 +1,9 @@
-﻿using MagicTerrain_V2.Saving;
+﻿using MagicTerrain_V2.Helpers;
+using MagicTerrain_V2.Jobs;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
+using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 
 namespace MagicTerrain_V2
@@ -11,6 +12,8 @@ namespace MagicTerrain_V2
 	public class Chunk
 	{
 		public float[] LocalTerrainMap { get;  set; }
+		public float[] UnEditedLocalTerrainMap { get; set; }
+		
 		public int[] ChunkTriangles { get;  set; }
 		public Vector3[] ChunkVertices { get;  set; }
 		public Mesh[] Meshes { get; private set; }
@@ -19,8 +22,8 @@ namespace MagicTerrain_V2
 		public bool Hasdata => LocalTerrainMap != null;
 
 		public Dictionary<int, float> EditedPoints { get; set; }= new();
-		public bool WasEdited { get; set; }
 		public int ChunkSize { get;  set; }
+		public ChunkCore ChunkCore { get; set; }
 
 		public void BuildMesh()
 		{
@@ -29,16 +32,6 @@ namespace MagicTerrain_V2
 			Meshes[0].vertices = ChunkVertices;
 			Meshes[0].triangles = ChunkTriangles;
 			Meshes[0].RecalculateNormals();
-		}
-
-		public void AddChunkEdit(int[] pointIndices, float[] pointValues, int count)
-		{
-			WasEdited = true;
-			for (var i = 0; i < count; i++)
-			{
-				var index = pointIndices[i];
-				EditedPoints[index] = pointValues[i];
-			}
 		}
 
 		public void CompressChunkData()
@@ -51,12 +44,13 @@ namespace MagicTerrain_V2
 
 		public void ApplyChunkEdits()
 		{
-			if (EditedPoints == null || EditsHaveBeenApplied) return;
+			if (EditsHaveBeenApplied) return;
 			foreach (var editedPoint in EditedPoints)
 			{
 				LocalTerrainMap[editedPoint.Key] = editedPoint.Value;
 			}
 			EditsHaveBeenApplied = true;
+			IsDirty = false;
 		}
 	}
 }
