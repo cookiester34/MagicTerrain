@@ -1,9 +1,9 @@
-using Ionic.Zlib;
 using MagicTerrain_V2;
 using MagicTerrain_V2.Saving;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using UnityEngine;
 
 public static class ChunkSetSaveLoadSystem

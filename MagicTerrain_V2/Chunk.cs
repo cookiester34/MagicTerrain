@@ -1,9 +1,5 @@
-﻿using MagicTerrain_V2.Helpers;
-using MagicTerrain_V2.Jobs;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using Unity.Collections;
-using Unity.Jobs;
 using UnityEngine;
 
 namespace MagicTerrain_V2
@@ -24,11 +20,13 @@ namespace MagicTerrain_V2
 		public Dictionary<int, float> EditedPoints { get; set; }= new();
 		public int ChunkSize { get;  set; }
 		public ChunkCore ChunkCore { get; set; }
+		public bool WasEdited { get; set; }
 
 		public void BuildMesh()
 		{
 			Meshes ??= new Mesh[1];
-			Meshes[0] = new Mesh();
+			Meshes[0] ??= new Mesh();
+			Meshes[0].Clear();
 			Meshes[0].vertices = ChunkVertices;
 			Meshes[0].triangles = ChunkTriangles;
 			Meshes[0].RecalculateNormals();

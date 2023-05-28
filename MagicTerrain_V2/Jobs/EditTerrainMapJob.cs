@@ -1,5 +1,6 @@
 ﻿using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 
@@ -20,20 +21,11 @@ namespace MagicTerrain_V2.Jobs
 		[ReadOnly]
 		public int chunkSize;
 
-		[NativeDisableParallelForRestriction]
+		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<bool> wasEdited;
 
-		[NativeDisableParallelForRestriction]
+		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<float> terrainMap;
-
-		[NativeDisableParallelForRestriction]
-		public NativeArray<float> editedTerrainMapValues;
-
-		[NativeDisableParallelForRestriction]
-		public NativeArray<int> editedTerrainMapIndices;
-
-		[NativeDisableParallelForRestriction]
-		public NativeArray<int> arrayCount;
 
 		[BurstCompile]
 		public void Execute(int index)
@@ -56,10 +48,6 @@ namespace MagicTerrain_V2.Jobs
 			var terrain = terrainMap[terrainMapIndex];
 			var lerpValue = Mathf.Lerp(terrain, add ? 0 : 1, 0.04f * pointValue);
 			terrainMap[terrainMapIndex] = lerpValue;
-
-			editedTerrainMapValues[arrayCount[0]] = lerpValue;
-			editedTerrainMapIndices[arrayCount[0]] = terrainMapIndex;
-			arrayCount[0]++;
 			wasEdited[0] = true;
 		}
 	}

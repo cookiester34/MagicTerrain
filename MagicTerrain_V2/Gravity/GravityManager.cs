@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -17,7 +16,7 @@ namespace MagicTerrain_V2.Gravity
 		private class GravityObjects
 		{
 			public GravitySimulatedObject GravitySimulatedObject { get; set; }
-			public GravityInflucener gravityInflucener { get; set; }
+			public GravityInflucener GravityInflucener { get; set; }
 		}
 		
 		[SerializeField]
@@ -25,7 +24,7 @@ namespace MagicTerrain_V2.Gravity
 		
 		[SerializeField]
 		private List<GravityInflucener> gravityInfluceners = new();
-		private List<GravityObjects> gravityObjects = new();
+		private readonly List<GravityObjects> gravityObjects = new();
 
 		private int frame;
 
@@ -39,6 +38,44 @@ namespace MagicTerrain_V2.Gravity
 			gravityInfluceners.Add(gravityInflucener);
 		}
 
+		private void FixedUpdate()
+		{
+			foreach (var gravityObject in gravityObjects)
+			{
+				var gravityObjectGravitySimulatedObject = gravityObject.GravitySimulatedObject;
+				var gravityObjectGravityInflucener = gravityObject.GravityInflucener;
+				
+				// Get the direction from sourceObject to targetObject
+				var simulatedObjectPosition = gravityObjectGravitySimulatedObject.transform.position;
+				var influcenerPosition = gravityObjectGravityInflucener.transform.position;
+				Vector3 direction = (influcenerPosition - simulatedObjectPosition).normalized;
+				gravityObjectGravitySimulatedObject.GravityDirection = direction;
+
+				var distanceOfSimulatedObjectKm = Vector3.Distance(simulatedObjectPosition, influcenerPosition);
+				var minimum = Mathf.Min(gravityObjectGravityInflucener.RadiusKm, distanceOfSimulatedObjectKm);
+				
+				var influencerVolume = 4.19f * Mathf.Pow(minimum, 3);
+				var influencerMass = gravityObjectGravityInflucener.DensityKgPMCubbed * influencerVolume;
+
+				var simulatedObjectMass = gravityObjectGravitySimulatedObject.MassKg;
+				var gravitationalConstant = 6.67e-14f;
+
+				var force = gravitationalConstant * (influencerMass * simulatedObjectMass /
+				                                     Mathf.Pow(distanceOfSimulatedObjectKm, 2)) / 1000f;
+
+				gravityObjectGravitySimulatedObject.Rigidbody.AddForce(direction * (Time.fixedDeltaTime * force), ForceMode.VelocityChange);
+
+				ApplyResistance(gravityObjectGravitySimulatedObject, gravityObjectGravityInflucener);
+			}
+
+			frame++;
+			if (frame % 30 == 0)
+			{
+				frame = 0;
+				AssignGravityInfluencers();
+			}
+		}
+		
 		private void AssignGravityInfluencers()
 		{
 			if (gravityInfluceners.Count == 0 || gravitySimulatedObjects.Count == 0) return;
@@ -51,32 +88,7 @@ namespace MagicTerrain_V2.Gravity
 				var closestInflucener = gravityInfluceners
 					.OrderBy(influcener => Vector3.Distance(influcener.transform.position, gravitySimulatedObjectPosition))
 					.FirstOrDefault();
-				gravityObjects.Add(new GravityObjects{gravityInflucener = closestInflucener, GravitySimulatedObject = gravitySimulatedObject});
-			}
-		}
-
-		private void FixedUpdate()
-		{
-			foreach (var gravityObject in gravityObjects)
-			{
-				var gravityObjectGravitySimulatedObject = gravityObject.GravitySimulatedObject;
-				var gravityObjectGravityInflucener = gravityObject.gravityInflucener;
-				
-				// Get the direction from sourceObject to targetObject
-				Vector3 direction = (gravityObjectGravityInflucener.transform.position - gravityObjectGravitySimulatedObject.transform.position).normalized;
-				gravityObjectGravitySimulatedObject.GravityDirection = direction;
-				gravityObjectGravitySimulatedObject.Rigidbody.AddForce(direction * Time.deltaTime * gravityObjectGravityInflucener.GravityStrength, ForceMode.VelocityChange);
-
-				ApplyResistance(gravityObjectGravitySimulatedObject, gravityObjectGravityInflucener);
-
-				ApplyRotation(gravityObjectGravitySimulatedObject, gravityObjectGravityInflucener);
-			}
-
-			frame++;
-			if (frame % 30 == 0)
-			{
-				frame = 0;
-				AssignGravityInfluencers();
+				gravityObjects.Add(new GravityObjects{GravityInflucener = closestInflucener, GravitySimulatedObject = gravitySimulatedObject});
 			}
 		}
 		
@@ -91,17 +103,10 @@ namespace MagicTerrain_V2.Gravity
 
 			// Calculate the magnitude of the resistance force using a quadratic function
 			var speed = rigidbody.velocity.magnitude;
-			var resistanceMagnitude = (speed * gravityInflucener.AirResistance) / gravitySimulatedObject.ObjectWeight;
+			var resistanceMagnitude = (speed * gravityInflucener.AirResistance) / gravitySimulatedObject.MassKg;
 
 			// Apply the resistance force to the Rigidbody
 			rigidbody.AddForce(resistanceDirection * resistanceMagnitude, ForceMode.Force);
-		}
-
-		private void ApplyRotation(GravitySimulatedObject gravitySimulatedObject, GravityInflucener gravityInflucener)
-		{
-			// Calculate the vector from the pivot point to the object
-			var gravityInflucenerTransform = gravityInflucener.transform;
-			var gravitySimulatedObjectTransform = gravitySimulatedObject.transform;
 		}
 	}
 }

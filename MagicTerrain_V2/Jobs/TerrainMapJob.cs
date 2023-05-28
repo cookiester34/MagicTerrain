@@ -1,6 +1,7 @@
 ﻿using MagicTerrain_V2.Helpers;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 
@@ -50,7 +51,7 @@ namespace MagicTerrain_V2.Jobs
 		[ReadOnly]
 		public float domainWarpAmp;
 
-		[NativeDisableParallelForRestriction]
+		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<float> terrainMap;
 
 		public int seed;

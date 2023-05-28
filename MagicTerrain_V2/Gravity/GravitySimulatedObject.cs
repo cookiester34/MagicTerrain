@@ -6,7 +6,7 @@ namespace MagicTerrain_V2.Gravity
 	public class GravitySimulatedObject : MonoBehaviour
 	{
 		[field: SerializeField]
-		public float ObjectWeight { get; set; } = 5f;
+		public float MassKg { get; set; } = 5f;
 		
 		public bool IsAffectedByGravity { get; set; }
 		public Vector3 GravityDirection { get; set; }

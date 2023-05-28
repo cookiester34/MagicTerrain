@@ -10,6 +10,7 @@ namespace MagicTerrain_V2
 {
 	public partial class ChunkCore
 	{
+		private const float TERRAIN_SURFACE = 0.4f;
 		private readonly List<Node> queuedNodes = new();
 		private readonly Dictionary<Node, ChunkTerrainMapJobData> queuedNodesCheckTerrainMapCompletion = new();
 		private readonly Dictionary<Node, ChunkMarchChunkJobData> queuedNodesCheckChunkJobCompletion = new();
@@ -62,23 +63,20 @@ namespace MagicTerrain_V2
 				foreach (var neighbourNode in neighbourChunks)
 				{
 					var diferenceInPosition = node.Position - neighbourNode.Position;
-
+				
 					var arrayLength = editedNodePointValues.Length;
 					var terrainMapEditJob = new EditTerrainMapJob()
 					{
 						diferenceInPosition = diferenceInPosition,
-						points = new NativeArray<EditedNodePointValue>(editedNodePointValues, Allocator.Persistent),
+						points = new NativeArray<EditedNodePointValue>(editedNodePointValues, Allocator.TempJob),
 						add = chunkEditJobData.Add,
 						chunkSize = chunkSize + 1,
-						terrainMap = new NativeArray<float>(neighbourNode.Chunk.LocalTerrainMap, Allocator.Persistent),
-						wasEdited = new NativeArray<bool>(1, Allocator.Persistent),
-						editedTerrainMapValues = new NativeArray<float>(arrayLength, Allocator.Persistent),
-						editedTerrainMapIndices = new NativeArray<int>(arrayLength, Allocator.Persistent),
-						arrayCount = new NativeArray<int>(1, Allocator.Persistent)
+						terrainMap = new NativeArray<float>(neighbourNode.Chunk.LocalTerrainMap, Allocator.TempJob),
+						wasEdited = new NativeArray<bool>(1, Allocator.TempJob)
 					};
-					var jobHandler = terrainMapEditJob.Schedule(arrayLength, 60);
+					var jobHandler = terrainMapEditJob.Schedule(arrayLength, 244);
 					JobHandle.ScheduleBatchedJobs();
-
+				
 					queuedNodesTerrainMapEdit.Add(neighbourNode,
 						new EditTerrainMapJobData(jobHandler, terrainMapEditJob));
 					neighbourNode.IsProccessing = true;
@@ -117,20 +115,20 @@ namespace MagicTerrain_V2
 					}
 
 					node.Chunk.LocalTerrainMap = editTerrainMapJob.terrainMap.ToArray();
-
+					
 					var meshDataJob = new MeshDataJob
 					{
 						chunkSize = chunkSize + 1,
 						terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap,
-							Allocator.Persistent),
-						terrainSurface = 0.7f,
-						vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
-						triangles = new NativeArray<int>(900000, Allocator.Persistent),
-						cube = new NativeArray<float>(8, Allocator.Persistent),
+							Allocator.TempJob),
+						terrainSurface = TERRAIN_SURFACE,
+						vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
+						triangles = new NativeArray<int>(900000, Allocator.TempJob),
+						cube = new NativeArray<float>(8, Allocator.TempJob),
 						smoothTerrain = smoothTerrain,
 						flatShaded = !smoothTerrain || flatShaded,
-						triCount = new NativeArray<int>(1, Allocator.Persistent),
-						vertCount = new NativeArray<int>(1, Allocator.Persistent)
+						triCount = new NativeArray<int>(1, Allocator.TempJob),
+						vertCount = new NativeArray<int>(1, Allocator.TempJob)
 					};
 					var meshDataJobHandle = meshDataJob.Schedule();
 
@@ -144,10 +142,8 @@ namespace MagicTerrain_V2
 				}
 
 				editTerrainMapJob.wasEdited.Dispose();
+				editTerrainMapJob.points.Dispose();
 				editTerrainMapJob.terrainMap.Dispose();
-				editTerrainMapJob.editedTerrainMapIndices.Dispose();
-				editTerrainMapJob.editedTerrainMapValues.Dispose();
-				editTerrainMapJob.arrayCount.Dispose();
 
 				terrainMapNodeToRemove.Add(node);
 			}
@@ -196,7 +192,7 @@ namespace MagicTerrain_V2
 						lacunarityCaves = lacunarityCaves,
 						gainCaves = gainCaves,
 						domainWarpAmp = domainWarpAmp,
-						terrainMap = new NativeArray<float>(terrainMapSize, Allocator.Persistent),
+						terrainMap = new NativeArray<float>(terrainMapSize, Allocator.TempJob),
 						seed = seed
 					};
 					var terrainMapJobHandle = terrainMapJob.Schedule(chunkSize + 1, 200);
@@ -224,7 +220,7 @@ namespace MagicTerrain_V2
 				creationQueueData.TerrainMapJobHandle.Complete();
 
 				node.Chunk.LocalTerrainMap = creationQueueData.TerrainMapJob.terrainMap.ToArray();
-				node.Chunk.UnEditedLocalTerrainMap = node.Chunk.LocalTerrainMap.ToArray();
+				node.Chunk.UnEditedLocalTerrainMap ??= node.Chunk.LocalTerrainMap.ToArray();
 				
 				if (node.Chunk.IsDirty)
 				{
@@ -234,15 +230,15 @@ namespace MagicTerrain_V2
 				var meshDataJob = new MeshDataJob
 				{
 					chunkSize = chunkSize + 1,
-					terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap, Allocator.Persistent),
-					terrainSurface = 0.7f,
-					vertices = new NativeArray<Vector3>(900000, Allocator.Persistent),
-					triangles = new NativeArray<int>(900000, Allocator.Persistent),
-					cube = new NativeArray<float>(8, Allocator.Persistent),
+					terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap, Allocator.TempJob),
+					terrainSurface = TERRAIN_SURFACE,
+					vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
+					triangles = new NativeArray<int>(900000, Allocator.TempJob),
+					cube = new NativeArray<float>(8, Allocator.TempJob),
 					smoothTerrain = smoothTerrain,
 					flatShaded = !smoothTerrain || flatShaded,
-					triCount = new NativeArray<int>(1, Allocator.Persistent),
-					vertCount = new NativeArray<int>(1, Allocator.Persistent)
+					triCount = new NativeArray<int>(1, Allocator.TempJob),
+					vertCount = new NativeArray<int>(1, Allocator.TempJob)
 				};
 				var meshDataJobHandle = meshDataJob.Schedule();
 
@@ -269,6 +265,7 @@ namespace MagicTerrain_V2
 
 				creationQueueData.MeshDataJobHandle.Complete();
 
+				//TODO: investigate Null ref here
 				var chunkContainerChunk = node.ChunkContainer.Chunk;
 				var tCount = creationQueueData.MeshDataJob.triCount[0];
 				chunkContainerChunk.ChunkTriangles = new int[tCount];

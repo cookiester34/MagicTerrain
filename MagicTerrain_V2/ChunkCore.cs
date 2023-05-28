@@ -18,9 +18,6 @@ namespace MagicTerrain_V2
 		private int chunkSize = 20;
 
 		[SerializeField]
-		private float worldSize = 10;
-
-		[SerializeField]
 		private int chunkSetSize = 10;
 
 		[SerializeField]
@@ -103,7 +100,7 @@ namespace MagicTerrain_V2
 
 		private int terrainMapSize;
 
-		private float TrueWorldSize => worldSize * chunkSize;
+		private float TrueWorldSize => RadiusKm;
 
 		private HashSet<Vector3> VisiblePositions { get; } = new();
 
@@ -372,20 +369,20 @@ namespace MagicTerrain_V2
 			node.IsProccessing = true;
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
-
+			
 			if (arraySize <= 0)
 			{
 				node.IsProccessing = false;
 				return;
 			}
-
+			
 			hitPoint = transform.worldToLocalMatrix.MultiplyPoint(hitPoint);
 			hitPoint -= node.Position;
-
+			
 			var getCirclePointsJob = GetCirclePointJobs(new Vector3Int((int)hitPoint.x, (int)hitPoint.y, (int)hitPoint.z), arraySize, radius, add);
 			var jobHandle = getCirclePointsJob.Schedule();
 			queuedNodesCirclePoints.Add(node, new ChunkEditJobData(jobHandle, getCirclePointsJob, add));
-
+			
 			JobHandle.ScheduleBatchedJobs();
 		}
 
@@ -416,7 +413,7 @@ namespace MagicTerrain_V2
 				hitPosition = hitPoint,
 				add = add,
 				radius = radius,
-				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.Persistent)
+				points = new NativeArray<EditedNodePointValue>(arraySize, Allocator.TempJob)
 			};
 			return getCirclePointsJob;
 		}

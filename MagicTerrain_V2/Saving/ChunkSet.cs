@@ -39,10 +39,10 @@ namespace MagicTerrain_V2.Saving
 				{
 					for (int i = 0; i < chunk.UnEditedLocalTerrainMap.Length; i++)
 					{
-						var value = chunk.UnEditedLocalTerrainMap[i];
+						var nonEditedValue = chunk.UnEditedLocalTerrainMap[i];
 						var editedValue = chunk.LocalTerrainMap[i];
-						if (value == editedValue) continue;
-
+						if (nonEditedValue == editedValue) continue;
+				
 						chunk.EditedPoints[i] = editedValue;
 						wasEdited = true;
 					}
@@ -83,6 +83,7 @@ namespace MagicTerrain_V2.Saving
 
 				var key = new Vector3Int(x, y, z);
 				var chunk = new Chunk();
+				chunk.WasEdited = true;
 				Chunks.Add(key, chunk);
 
 				var editCount = (int)reader.ReadInt16();
