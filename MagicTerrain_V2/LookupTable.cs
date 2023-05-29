@@ -2,8 +2,15 @@
 
 public static class LookupTable
 {
-	public static readonly int3[] CornerTable = new int3[8]
-	{
+	public static readonly int[] LodTable = {
+		1,
+		2,
+		4,
+		16,
+		32
+	};
+	
+	public static readonly int3[] CornerTable = {
 		new(0, 0, 0),
 		new(1, 0, 0),
 		new(1, 1, 0),

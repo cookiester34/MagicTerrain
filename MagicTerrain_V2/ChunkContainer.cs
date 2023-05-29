@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MagicTerrain_V2
 {
@@ -19,11 +18,38 @@ namespace MagicTerrain_V2
 
 		public ChunkCore ChunkCore { get; set; }
 
+		private int lodIndex;
+		public int LodIndex
+		{
+			get
+			{
+				return lodIndex;
+			}
+			set
+			{
+				if (lodIndex != value)
+				{
+					lodIndex = value;
+					UpdateMeshLod();
+				}
+			}
+		}
+
 		private void Awake()
 		{
 			if (meshRenderer == null) meshRenderer = gameObject.GetComponent<MeshRenderer>();
 			if (meshCollider == null) meshCollider = gameObject.GetComponent<MeshCollider>();
 			if (meshFilter == null) meshFilter = gameObject.GetComponent<MeshFilter>();
+		}
+
+		public void DisableContainer()
+		{
+			meshRenderer.enabled = false;
+		}
+
+		public void EnableContainer()
+		{
+			meshRenderer.enabled = true;
 		}
 
 		public void AssignChunk(Chunk newChunk)
@@ -47,8 +73,17 @@ namespace MagicTerrain_V2
 			if (Chunk.Meshes.Length == 0) return;
 			CheckContainerHasComponents();
 			meshRenderer.material = material;
-			meshFilter.sharedMesh = Chunk.Meshes[0];
-			meshCollider.sharedMesh = Chunk.Meshes[0];
+			meshFilter.sharedMesh = Chunk.Meshes[LodIndex];
+			meshCollider.sharedMesh = Chunk.Meshes[LodIndex];
+		}
+
+		private void UpdateMeshLod()
+		{
+			if (Chunk?.Meshes == null) return;
+			if (Chunk.Meshes.Length == 0) return;
+			CheckContainerHasComponents();
+			meshFilter.sharedMesh = Chunk.Meshes[LodIndex];
+			meshCollider.sharedMesh = Chunk.Meshes[LodIndex];
 		}
 
 		private void CheckContainerHasComponents()

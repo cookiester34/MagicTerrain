@@ -65,6 +65,7 @@ namespace MagicTerrain_V2
 		public void RequestChunk()
 		{
 			chunkContainer = chunkCore.RequestChunkContainer(position, this, chunk);
+			chunkContainer.EnableContainer();
 			chunkContainer.Node = this;
 		}
 
@@ -89,6 +90,14 @@ namespace MagicTerrain_V2
 			
 			IsDisabled = false;
 			IsVisible = true;
+		}
+
+		public void SetLodIndex(int index)
+		{
+			if (chunkContainer != null)
+			{
+				chunkContainer.LodIndex = index;
+			}
 		}
 		
 		public bool IsNodeVisible(Plane[] planes)

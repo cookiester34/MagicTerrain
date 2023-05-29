@@ -276,18 +276,38 @@ namespace MagicTerrain_V2
 
 				if (mainCamera == null)
 				{
-					Debug.LogError("Cannot perform frustrum culling without a camera");
+					Debug.LogError("Cannot perform frustum culling without a camera");
 					node.EnableNode();
 					continue;
 				}
+				
+				var distance = Vector3.Distance(playerTransform.position, node.PositionReal);
 				if (!node.IsNodeVisible(cameraPlanes))
 				{
-					var distance = Vector3.Distance(playerTransform.position, node.PositionReal);
 					if (distance > trueIgnoreCullDistance)
 					{
 						node.Disable();
 						continue;
 					}
+				}
+
+				switch (distance)
+				{
+					case <100:
+						node.SetLodIndex(0);
+						break;
+					case <150:
+						node.SetLodIndex(1);
+						break;
+					case <200:
+						node.SetLodIndex(2);
+						break;
+					case <250:
+						node.SetLodIndex(3);
+						break;
+					default:
+						node.SetLodIndex(4);
+						break;
 				}
 
 				node.EnableNode();
@@ -350,7 +370,7 @@ namespace MagicTerrain_V2
 
 		public void ReturnChunkContainer(ChunkContainer chunkContainer)
 		{
-			chunkContainer.gameObject.SetActive(false);
+			chunkContainer.DisableContainer();
 			chunkContainer.UnAssignChunk();
 		}
 

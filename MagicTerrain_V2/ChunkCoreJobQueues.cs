@@ -122,13 +122,21 @@ namespace MagicTerrain_V2
 						terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap,
 							Allocator.TempJob),
 						terrainSurface = TERRAIN_SURFACE,
-						vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
-						triangles = new NativeArray<int>(900000, Allocator.TempJob),
 						cube = new NativeArray<float>(8, Allocator.TempJob),
 						smoothTerrain = smoothTerrain,
 						flatShaded = !smoothTerrain || flatShaded,
-						triCount = new NativeArray<int>(1, Allocator.TempJob),
-						vertCount = new NativeArray<int>(1, Allocator.TempJob)
+						vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
+						triangles = new NativeArray<int>(900000, Allocator.TempJob),
+						triCount = new NativeArray<int>(7, Allocator.TempJob),
+						vertCount = new NativeArray<int>(7, Allocator.TempJob),
+						vertices1 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+						triangles1 = new NativeArray<int>(900000, Allocator.TempJob),
+						vertices2 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+						triangles2 = new NativeArray<int>(900000, Allocator.TempJob),
+						vertices3 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+						triangles3 = new NativeArray<int>(900000, Allocator.TempJob),
+						vertices4 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+						triangles4 = new NativeArray<int>(900000, Allocator.TempJob)
 					};
 					var meshDataJobHandle = meshDataJob.Schedule();
 
@@ -232,13 +240,21 @@ namespace MagicTerrain_V2
 					chunkSize = chunkSize + 1,
 					terrainMap = new NativeArray<float>(node.Chunk.LocalTerrainMap, Allocator.TempJob),
 					terrainSurface = TERRAIN_SURFACE,
-					vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
-					triangles = new NativeArray<int>(900000, Allocator.TempJob),
 					cube = new NativeArray<float>(8, Allocator.TempJob),
 					smoothTerrain = smoothTerrain,
 					flatShaded = !smoothTerrain || flatShaded,
-					triCount = new NativeArray<int>(1, Allocator.TempJob),
-					vertCount = new NativeArray<int>(1, Allocator.TempJob)
+					vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
+					triangles = new NativeArray<int>(900000, Allocator.TempJob),
+					triCount = new NativeArray<int>(7, Allocator.TempJob),
+					vertCount = new NativeArray<int>(7, Allocator.TempJob),
+					vertices1 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+					triangles1 = new NativeArray<int>(900000, Allocator.TempJob),
+					vertices2 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+					triangles2 = new NativeArray<int>(900000, Allocator.TempJob),
+					vertices3 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+					triangles3 = new NativeArray<int>(900000, Allocator.TempJob),
+					vertices4 = new NativeArray<Vector3>(900000, Allocator.TempJob),
+					triangles4 = new NativeArray<int>(900000, Allocator.TempJob)
 				};
 				var meshDataJobHandle = meshDataJob.Schedule();
 
@@ -266,31 +282,126 @@ namespace MagicTerrain_V2
 				creationQueueData.MeshDataJobHandle.Complete();
 
 				//TODO: investigate Null ref here
-				var chunkContainerChunk = node.ChunkContainer.Chunk;
-				var tCount = creationQueueData.MeshDataJob.triCount[0];
-				chunkContainerChunk.ChunkTriangles = new int[tCount];
-
+				var chunk = node.ChunkContainer.Chunk;
 				var meshDataJob = creationQueueData.MeshDataJob;
 
+				var triCount = creationQueueData.MeshDataJob.triCount.ToArray();
+				var vertCount = creationQueueData.MeshDataJob.vertCount.ToArray();
+
+				chunk.MeshDataSets ??= new Chunk.MeshData[7];
+				//LOD0
+				var tCount = triCount[0];
+				chunk.MeshDataSets[0].chunkTriangles = new int[tCount];
 				for (var i = 0; i < tCount; i++)
 				{
-					chunkContainerChunk.ChunkTriangles[i] = meshDataJob.triangles[i];
+					chunk.MeshDataSets[0].chunkTriangles[i] = meshDataJob.triangles[i];
 				}
-
-				var vCount = creationQueueData.MeshDataJob.vertCount[0];
-				chunkContainerChunk.ChunkVertices = new Vector3[vCount];
+				var vCount = vertCount[0];
+				chunk.MeshDataSets[0].chunkVertices = new Vector3[vCount];
 				for (var i = 0; i < vCount; i++)
 				{
-					chunkContainerChunk.ChunkVertices[i] = meshDataJob.vertices[i];
+					chunk.MeshDataSets[0].chunkVertices[i] = meshDataJob.vertices[i];
 				}
+				
+				//LOD1
+				var tCount1 = triCount[1];
+				chunk.MeshDataSets[1].chunkTriangles = new int[tCount1];
+				for (var i = 0; i < tCount1; i++)
+				{
+					chunk.MeshDataSets[1].chunkTriangles[i] = meshDataJob.triangles1[i];
+				}
+				var vCount1 = vertCount[1];
+				chunk.MeshDataSets[1].chunkVertices = new Vector3[vCount1];
+				for (var i = 0; i < vCount1; i++)
+				{
+					chunk.MeshDataSets[1].chunkVertices[i] = meshDataJob.vertices1[i];
+				}
+				
+				//LOD2
+				var tCount2 = triCount[2];
+				chunk.MeshDataSets[2].chunkTriangles = new int[tCount2];
+				for (var i = 0; i < tCount2; i++)
+				{
+					chunk.MeshDataSets[2].chunkTriangles[i] = meshDataJob.triangles2[i];
+				}
+				var vCount2 = vertCount[2];
+				chunk.MeshDataSets[2].chunkVertices = new Vector3[vCount2];
+				for (var i = 0; i < vCount2; i++)
+				{
+					chunk.MeshDataSets[2].chunkVertices[i] = meshDataJob.vertices2[i];
+				}
+				
+				//LOD3
+				var tCount3 = triCount[3];
+				chunk.MeshDataSets[3].chunkTriangles = new int[tCount3];
+				for (var i = 0; i < tCount3; i++)
+				{
+					chunk.MeshDataSets[3].chunkTriangles[i] = meshDataJob.triangles3[i];
+				}
+				var vCount3 = vertCount[3];
+				chunk.MeshDataSets[3].chunkVertices = new Vector3[vCount3];
+				for (var i = 0; i < vCount3; i++)
+				{
+					chunk.MeshDataSets[3].chunkVertices[i] = meshDataJob.vertices3[i];
+				}
+				
+				//LOD4
+				var tCount4 = triCount[4];
+				chunk.MeshDataSets[4].chunkTriangles = new int[tCount4];
+				for (var i = 0; i < tCount4; i++)
+				{
+					chunk.MeshDataSets[4].chunkTriangles[i] = meshDataJob.triangles4[i];
+				}
+				var vCount4 = vertCount[4];
+				chunk.MeshDataSets[4].chunkVertices = new Vector3[vCount4];
+				for (var i = 0; i < vCount4; i++)
+				{
+					chunk.MeshDataSets[4].chunkVertices[i] = meshDataJob.vertices4[i];
+				}
+				
+				//LOD5
+				// var tCount5 = triCount[5];
+				// chunk.MeshDataSets[5].chunkTriangles = new int[tCount5];
+				// for (var i = 0; i < tCount5; i++)
+				// {
+				// 	chunk.MeshDataSets[5].chunkTriangles[i] = meshDataJob.triangles5[i];
+				// }
+				// var vCount5 = vertCount[5];
+				// chunk.MeshDataSets[5].chunkVertices = new Vector3[vCount5];
+				// for (var i = 0; i < vCount5; i++)
+				// {
+				// 	chunk.MeshDataSets[5].chunkVertices[i] = meshDataJob.vertices5[i];
+				// }
+				
+				//LOD6
+				// var tCount6 = triCount[6];
+				// chunk.MeshDataSets[6].chunkTriangles = new int[tCount6];
+				// for (var i = 0; i < tCount6; i++)
+				// {
+				// 	chunk.MeshDataSets[6].chunkTriangles[i] = meshDataJob.triangles6[i];
+				// }
+				// var vCount6 = vertCount[6];
+				// chunk.MeshDataSets[6].chunkVertices = new Vector3[vCount6];
+				// for (var i = 0; i < vCount6; i++)
+				// {
+				// 	chunk.MeshDataSets[6].chunkVertices[i] = meshDataJob.vertices6[i];
+				// }
 
-				chunkContainerChunk.BuildMesh();
-
-				creationQueueData.MeshDataJob.vertices.Dispose();
-				creationQueueData.MeshDataJob.triangles.Dispose();
+				chunk.BuildMesh();
+				
 				creationQueueData.MeshDataJob.cube.Dispose();
 				creationQueueData.MeshDataJob.triCount.Dispose();
 				creationQueueData.MeshDataJob.vertCount.Dispose();
+				creationQueueData.MeshDataJob.vertices.Dispose();
+				creationQueueData.MeshDataJob.triangles.Dispose();
+				creationQueueData.MeshDataJob.vertices1.Dispose();
+				creationQueueData.MeshDataJob.triangles1.Dispose();
+				creationQueueData.MeshDataJob.vertices2.Dispose();
+				creationQueueData.MeshDataJob.triangles2.Dispose();
+				creationQueueData.MeshDataJob.vertices3.Dispose();
+				creationQueueData.MeshDataJob.triangles3.Dispose();
+				creationQueueData.MeshDataJob.vertices4.Dispose();
+				creationQueueData.MeshDataJob.triangles4.Dispose();
 				creationQueueData.MeshDataJob.terrainMap.Dispose();
 
 				node.ChunkContainer.CreateChunkMesh(coreMaterial);
