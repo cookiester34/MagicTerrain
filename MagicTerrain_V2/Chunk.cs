@@ -9,11 +9,10 @@ namespace MagicTerrain_V2
 	{
 		public float[] LocalTerrainMap { get;  set; }
 		public float[] UnEditedLocalTerrainMap { get; set; }
-		
+
 		public int[] ChunkTriangles { get;  set; }
 		public Vector3[] ChunkVertices { get;  set; }
 		public Mesh[] Meshes { get; private set; }
-		public bool IsDirty { get; set; }
 		public bool EditsHaveBeenApplied { get; set; }
 		public bool Hasdata => LocalTerrainMap != null;
 
@@ -45,10 +44,15 @@ namespace MagicTerrain_V2
 			if (EditsHaveBeenApplied) return;
 			foreach (var editedPoint in EditedPoints)
 			{
-				LocalTerrainMap[editedPoint.Key] = editedPoint.Value;
+				if (editedPoint.Key >= 0 && editedPoint.Key < LocalTerrainMap.Length)
+					LocalTerrainMap[editedPoint.Key] = editedPoint.Value;
+				else
+				{
+					Debug.Log(editedPoint.Key);
+					Debug.Log(LocalTerrainMap.Length);
+				}
 			}
 			EditsHaveBeenApplied = true;
-			IsDirty = false;
 		}
 	}
 }

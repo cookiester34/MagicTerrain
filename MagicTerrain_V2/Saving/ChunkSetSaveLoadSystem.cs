@@ -127,7 +127,6 @@ public static class ChunkSetSaveLoadSystem
 		var file = File.Open(savePath, FileMode.Open);
 		using var reader = new BinaryReader(file);
 		chunkSet.Deserialize(reader);
-		chunkSet.MarkChunksAsDirty();
 		if (!ChunkSets.TryAdd(chunkSetPosition, chunkSet))
 		{
 			Debug.LogError($"chunkset already exists at {chunkSetPosition}");

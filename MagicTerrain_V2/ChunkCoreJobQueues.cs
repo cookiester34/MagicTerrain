@@ -63,7 +63,7 @@ namespace MagicTerrain_V2
 				foreach (var neighbourNode in neighbourChunks)
 				{
 					var diferenceInPosition = node.Position - neighbourNode.Position;
-				
+
 					var arrayLength = editedNodePointValues.Length;
 					var terrainMapEditJob = new EditTerrainMapJob()
 					{
@@ -76,7 +76,7 @@ namespace MagicTerrain_V2
 					};
 					var jobHandler = terrainMapEditJob.Schedule(arrayLength, 244);
 					JobHandle.ScheduleBatchedJobs();
-				
+
 					queuedNodesTerrainMapEdit.Add(neighbourNode,
 						new EditTerrainMapJobData(jobHandler, terrainMapEditJob));
 					neighbourNode.IsProccessing = true;
@@ -115,7 +115,7 @@ namespace MagicTerrain_V2
 					}
 
 					node.Chunk.LocalTerrainMap = editTerrainMapJob.terrainMap.ToArray();
-					
+
 					var meshDataJob = new MeshDataJob
 					{
 						chunkSize = chunkSize + 1,
@@ -221,11 +221,7 @@ namespace MagicTerrain_V2
 
 				node.Chunk.LocalTerrainMap = creationQueueData.TerrainMapJob.terrainMap.ToArray();
 				node.Chunk.UnEditedLocalTerrainMap ??= node.Chunk.LocalTerrainMap.ToArray();
-				
-				if (node.Chunk.IsDirty)
-				{
-					node.Chunk.ApplyChunkEdits();
-				}
+				node.Chunk.ApplyChunkEdits();
 
 				var meshDataJob = new MeshDataJob
 				{

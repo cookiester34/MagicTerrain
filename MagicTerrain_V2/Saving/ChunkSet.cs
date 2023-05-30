@@ -20,14 +20,6 @@ namespace MagicTerrain_V2.Saving
 			this.chunkSetPosition = chunkSetPosition;
 		}
 
-		public void MarkChunksAsDirty()
-		{
-			foreach (var (_, chunk) in Chunks)
-			{
-				chunk.IsDirty = true;
-			}
-		}
-
 		public void Serialize(BinaryWriter writer)
 		{
 			//figure out which chunks have been edited
@@ -42,7 +34,7 @@ namespace MagicTerrain_V2.Saving
 						var nonEditedValue = chunk.UnEditedLocalTerrainMap[i];
 						var editedValue = chunk.LocalTerrainMap[i];
 						if (nonEditedValue == editedValue) continue;
-				
+
 						chunk.EditedPoints[i] = editedValue;
 						wasEdited = true;
 					}
