@@ -15,7 +15,7 @@ namespace MagicTerrain_V2
 		public bool DebugMode { get; set; }
 
 		[SerializeField]
-		private int chunkSize = 20;
+		internal int chunkSize = 20;
 
 		[SerializeField]
 		private int chunkSetSize = 10;
@@ -75,10 +75,10 @@ namespace MagicTerrain_V2
 		private int seed = 1337;
 
 		[SerializeField]
-		private bool smoothTerrain;
+		internal bool smoothTerrain;
 
 		[SerializeField]
-		private bool flatShaded;
+		internal bool flatShaded;
 
 		[SerializeField]
 		private Material coreMaterial;
@@ -138,7 +138,7 @@ namespace MagicTerrain_V2
 		{
 			ChunkSetSaveLoadSystem.InitializeChunkSetSaveLoadSystem(chunkSetSize * chunkSize);
 			var roundVectorDownToNearestChunkSet = ChunkSetSaveLoadSystem.RoundVectorDownToNearestChunkSet(playerTransform.position);
-			if (!ChunkSetSaveLoadSystem.TryLoadChunkSet(roundVectorDownToNearestChunkSet))
+			if (!ChunkSetSaveLoadSystem.TryLoadChunkSet(this, roundVectorDownToNearestChunkSet))
 			{
 				Debug.LogError($"Failed to load ChunkSet at {roundVectorDownToNearestChunkSet}");
 			}
@@ -184,7 +184,7 @@ namespace MagicTerrain_V2
 		{
 			ChecKGetCirclePointJobsQueue();
 
-			CheckEditTerrainMapJobsQueue();
+			CheckEditQueues();
 
 			#region ChunkCreationQueue
 
@@ -192,11 +192,7 @@ namespace MagicTerrain_V2
 			if (queueUpdateCount % queueUpdateFrequency != 0) return;
 			queueUpdateCount = 0;
 
-			SchedualTerrainMapJobsQueue();
-
-			SchedualMeshCreationJobsQueue();
-
-			CheckMeshCreationJobQueue();
+			CheckGenerateQueues();
 
 			#endregion
 		}
@@ -245,7 +241,10 @@ namespace MagicTerrain_V2
 					if (!nodes.ContainsKey(position))
 					{
 						var chunkPosition = new Vector3Int(x, y, z);
-						nodes.Add(position, new Node(chunkPosition, realPosition, chunkSize, RequestChunk(chunkPosition), this));
+						var requestChunk = RequestChunk(chunkPosition);
+						var node = new Node(chunkPosition, realPosition, chunkSize, requestChunk, this);
+						requestChunk.AssignNode(node);
+						nodes.Add(position, node);
 					}
 					else
 					{
@@ -296,11 +295,11 @@ namespace MagicTerrain_V2
 
 		private Chunk RequestChunk(Vector3Int position)
 		{
-			if (ChunkSetSaveLoadSystem.TryGetChunk(position, out var foundChunk)) return foundChunk;
+			if (ChunkSetSaveLoadSystem.TryGetChunk(this, position, out var foundChunk)) return foundChunk;
 
-			var requestedChunk = new Chunk();
+			var requestedChunk = new Chunk(TERRAIN_SURFACE, smoothTerrain, flatShaded);
 			requestedChunk.ChunkSize = chunkSize;
-			ChunkSetSaveLoadSystem.AddChunkToChunkSet(position, requestedChunk);
+			ChunkSetSaveLoadSystem.AddChunkToChunkSet(this, position, requestedChunk);
 
 			return requestedChunk;
 		}
@@ -333,16 +332,30 @@ namespace MagicTerrain_V2
 
 		private void SetupChunkContainer(Vector3 position, Node node, Chunk chunk, ChunkContainer foundContainer)
 		{
-			foundContainer.AssignChunk(chunk);
+			foundContainer.AssignChunk(chunk, coreMaterial);
 			foundContainer.transform.localPosition = position;
 
 			if (chunk is { Hasdata: false })
 			{
-				queuedNodes.Add(node);
+				node.Chunk.CreateAndQueueTerrainMapJob(
+					node.Position,
+					TrueWorldSize,
+					octaves,
+					weightedStrength,
+					lacunarity,
+					gain,
+					octavesCaves,
+					weightedStrengthCaves,
+					lacunarityCaves,
+					gainCaves,
+					domainWarpAmp,
+					terrainMapSize,
+					seed);
+				generatingNodes.Add(node);
 			}
 			else if (chunk != null)
 			{
-				foundContainer.CreateChunkMesh(coreMaterial);
+				foundContainer.CreateChunkMesh();
 			}
 
 			foundContainer.gameObject.SetActive(true);
@@ -358,7 +371,10 @@ namespace MagicTerrain_V2
 		{
 			var neighbourNodes = GetNeighbourChunks(node.Position);
 
-			if (neighbourNodes.Any(x => x.IsProccessing)) return;
+			if (neighbourNodes.Any(x => editingNodes.Contains(x)))
+			{
+				return;
+			}
 
 			if (queuedNodesCirclePoints.ContainsKey(node))
 			{
@@ -366,13 +382,11 @@ namespace MagicTerrain_V2
 				return;
 			}
 
-			node.IsProccessing = true;
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
 			
 			if (arraySize <= 0)
 			{
-				node.IsProccessing = false;
 				return;
 			}
 			

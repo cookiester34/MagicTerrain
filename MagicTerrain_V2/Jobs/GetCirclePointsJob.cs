@@ -6,7 +6,7 @@ using UnityEngine;
 namespace MagicTerrain_V2.Jobs
 {
 	[BurstCompile]
-	public struct GetCirclePointsJob : IJob
+	public struct GetCirclePointsJob : IJob, IChunkJob
 	{
 		[ReadOnly]
 		public Vector3 hitPosition;

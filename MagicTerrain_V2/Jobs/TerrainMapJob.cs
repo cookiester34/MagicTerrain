@@ -8,16 +8,13 @@ using UnityEngine;
 namespace MagicTerrain_V2.Jobs
 {
 	[BurstCompile]
-	public struct TerrainMapJob : IJobParallelFor
+	public struct TerrainMapJob : IJobParallelFor, IChunkJob
 	{
 		[ReadOnly]
 		public int chunkSize;
 
 		[ReadOnly]
 		public Vector3 chunkPosition;
-
-		[ReadOnly]
-		public Vector3 planetCenter;
 
 		[ReadOnly]
 		public float planetSize;
@@ -85,7 +82,7 @@ namespace MagicTerrain_V2.Jobs
 				FastNoiseLite.DomainWarp(ref xPos, ref yPos, ref zPos, seed, octaves, lacunarity, gain,
 					domainWarpAmp);
 				
-				var distance = Vector3.Distance(new Vector3(xPos, yPos, zPos), planetCenter);
+				var distance = Vector3.Distance(new Vector3(xPos, yPos, zPos), Vector3.zero);
 				var planetFill = Mathf.Clamp01(distance / planetSize);
 				
 				var t = 1f - Mathf.Exp(-0.3f * (distance - (planetSize)));

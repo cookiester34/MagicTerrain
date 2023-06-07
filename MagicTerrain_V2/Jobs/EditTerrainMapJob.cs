@@ -7,7 +7,7 @@ using UnityEngine;
 namespace MagicTerrain_V2.Jobs
 {
 	[BurstCompile]
-	public struct EditTerrainMapJob : IJobParallelFor
+	public struct EditTerrainMapJob : IJobParallelFor, IChunkJob
 	{
 		[ReadOnly]
 		public Vector3Int diferenceInPosition;

@@ -23,13 +23,13 @@ public static class ChunkSetSaveLoadSystem
 		}
 	}
 
-	public static void AddChunkToChunkSet(Vector3Int chunkPosition, Chunk chunk)
+	public static void AddChunkToChunkSet(ChunkCore chunkCore, Vector3Int chunkPosition, Chunk chunk)
 	{
 		var chunksetPosition = RoundVectorDownToNearestChunkSet(chunkPosition);
 
 		if (!ChunkSets.ContainsKey(chunksetPosition))
 		{
-			if (!TryLoadChunkSet(chunksetPosition))
+			if (!TryLoadChunkSet(chunkCore, chunksetPosition))
 			{
 				Debug.LogError($"Failed to load or create chunkset at {chunksetPosition}");
 				return;
@@ -42,12 +42,12 @@ public static class ChunkSetSaveLoadSystem
 		}
 	}
 
-	public static bool TryGetChunk(Vector3Int chunkPosition, out Chunk chunk)
+	public static bool TryGetChunk(ChunkCore chunkCore, Vector3Int chunkPosition, out Chunk chunk)
 	{
 		var chunksetPosition = RoundVectorDownToNearestChunkSet(chunkPosition);
 		if (!ChunkSets.ContainsKey(chunksetPosition))
 		{
-			if (!TryLoadChunkSet(chunksetPosition))
+			if (!TryLoadChunkSet(chunkCore, chunksetPosition))
 			{
 				Debug.LogError($"Failed to load or create chunkset at {chunksetPosition}");
 				chunk = null;
@@ -113,10 +113,10 @@ public static class ChunkSetSaveLoadSystem
 		ChunkSets.Clear();
 	}
 
-	public static bool TryLoadChunkSet(Vector3Int chunkSetPosition)
+	public static bool TryLoadChunkSet(ChunkCore chunkCore, Vector3Int chunkSetPosition)
 	{
 		var savePath = Path.Combine(savePathDirectory, $"{chunkSetPosition}.mtcs");
-		var chunkSet = new ChunkSet(chunkSetPosition);
+		var chunkSet = new ChunkSet(chunkSetPosition, chunkCore);
 		if (!File.Exists(savePath))
 		{
 			if (ChunkSets.TryAdd(chunkSetPosition, chunkSet)) return true;

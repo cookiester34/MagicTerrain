@@ -8,7 +8,7 @@ using static LookupTable;
 namespace MagicTerrain_V2.Jobs
 {
 	[BurstCompile]
-	public struct MeshDataJob : IJob
+	public struct MeshDataJob : IJob, IChunkJob
 	{
 		[ReadOnly]
 		public bool smoothTerrain;

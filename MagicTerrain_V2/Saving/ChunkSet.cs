@@ -14,10 +14,13 @@ namespace MagicTerrain_V2.Saving
 
 		public Dictionary<Vector3Int, Chunk> Chunks { get; }
 
-		public ChunkSet(Vector3Int chunkSetPosition)
+		private ChunkCore chunkCore;
+
+		public ChunkSet(Vector3Int chunkSetPosition, ChunkCore chunkCore)
 		{
 			Chunks = new();
 			this.chunkSetPosition = chunkSetPosition;
+			this.chunkCore = chunkCore;
 		}
 
 		public void Serialize(BinaryWriter writer)
@@ -53,10 +56,10 @@ namespace MagicTerrain_V2.Saving
 				writer.Write(key.z);
 
 				// value
-				writer.Write((short)chunk.EditedPoints.Count);
+				writer.Write(chunk.EditedPoints.Count);
 				foreach (var edit in chunk.EditedPoints)
 				{
-					writer.Write((short)edit.Key);
+					writer.Write(edit.Key);
 					writer.Write(edit.Value);
 				}
 			}
@@ -74,14 +77,15 @@ namespace MagicTerrain_V2.Saving
 				var z = reader.ReadInt32();
 
 				var key = new Vector3Int(x, y, z);
-				var chunk = new Chunk();
+				var chunk = new Chunk(ChunkCore.TERRAIN_SURFACE, chunkCore.smoothTerrain, chunkCore.flatShaded);
+				chunk.ChunkSize = chunkCore.chunkSize;
 				chunk.WasEdited = true;
 				Chunks.Add(key, chunk);
 
-				var editCount = (int)reader.ReadInt16();
+				var editCount = reader.ReadInt32();
 				for (int j = 0; j < editCount; j++)
 				{
-					var index = (int)reader.ReadInt16();
+					var index = reader.ReadInt32();
 					var value = reader.ReadSingle();
 					chunk.EditedPoints[index] = value;
 				}

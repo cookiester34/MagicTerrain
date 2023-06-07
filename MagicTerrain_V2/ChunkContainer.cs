@@ -11,6 +11,8 @@ namespace MagicTerrain_V2
 
 		private MeshFilter meshFilter;
 
+		private Material material;
+
 		public Chunk Chunk { get; private set; }
 		
 		public Node Node { get; set; }
@@ -26,8 +28,9 @@ namespace MagicTerrain_V2
 			if (meshFilter == null) meshFilter = gameObject.GetComponent<MeshFilter>();
 		}
 
-		public void AssignChunk(Chunk newChunk)
+		public void AssignChunk(Chunk newChunk, Material material)
 		{
+			this.material = material;
 			Chunk = newChunk;
 			IsUsed = true;
 		}
@@ -41,7 +44,7 @@ namespace MagicTerrain_V2
 			meshCollider.sharedMesh = null;
 		}
 
-		public void CreateChunkMesh(Material material)
+		public void CreateChunkMesh()
 		{
 			if (Chunk?.Meshes == null) return;
 			if (Chunk.Meshes.Length == 0) return;
