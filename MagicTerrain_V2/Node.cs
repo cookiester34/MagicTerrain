@@ -9,7 +9,6 @@ namespace MagicTerrain_V2
 	{
 		private readonly ChunkCore chunkCore;
 
-		[SerializeField]
 		private Chunk chunk;
 		public Chunk Chunk
 		{
@@ -17,11 +16,8 @@ namespace MagicTerrain_V2
 			set => chunk = value;
 		}
 
-		[SerializeField]
-		private Vector3Int position;
-		public Vector3Int Position => position;
-		
-		[SerializeField]
+		public Vector3Int Position { get; }
+
 		private Vector3 positionReal;
 		public Vector3 PositionReal
 		{
@@ -29,23 +25,13 @@ namespace MagicTerrain_V2
 			set => positionReal = value;
 		}
 
-		[SerializeField]
-		private ChunkContainer chunkContainer;
-		public ChunkContainer ChunkContainer => chunkContainer;
+		public ChunkContainer ChunkContainer { get; private set; }
 
-		[field:SerializeField]
 		public bool IsLoaded { get; private set; }
 
-		[field:SerializeField]
 		public bool IsDisabled { get; private set; }
 
-		[field:SerializeField]
 		public bool IsVisible { get; private set; }
-		
-		[field:SerializeField]
-		public bool IsQueued { get; set; }
-
-		public bool IsProccessing { get; set; }
 
 		private int size;
 
@@ -53,28 +39,30 @@ namespace MagicTerrain_V2
 		{
 			this.size = size * 2;
 			this.chunkCore = chunkCore;
-			this.position = position;
+			this.Position = position;
 			this.positionReal = positionReal;
 			this.chunk = chunk;
 
 			IsDisabled = true;
 			IsLoaded = false;
 			IsVisible = false;
+			
+			RequestChunk();
 		}
 
 		public void RequestChunk()
 		{
-			chunkContainer = chunkCore.RequestChunkContainer(position, this, chunk);
-			chunkContainer.EnableContainer();
-			chunkContainer.Node = this;
+			ChunkContainer = chunkCore.RequestChunkContainer(Position, this, chunk);
+			ChunkContainer.EnableContainer();
+			ChunkContainer.Node = this;
 		}
 
 		public void ReturnChunk()
 		{
-			if (chunkContainer == null) return;
-			chunkContainer.Node = null;
-			chunkCore.ReturnChunkContainer(chunkContainer);
-			chunkContainer = null;
+			if (ChunkContainer == null) return;
+			ChunkContainer.Node = null;
+			chunkCore.ReturnChunkContainer(ChunkContainer);
+			ChunkContainer = null;
 		}
 
 		public void EnableNode()
@@ -94,9 +82,9 @@ namespace MagicTerrain_V2
 
 		public void SetLodIndex(int index)
 		{
-			if (chunkContainer != null)
+			if (ChunkContainer != null)
 			{
-				chunkContainer.LodIndex = index;
+				ChunkContainer.LodIndex = index;
 			}
 		}
 		
@@ -114,9 +102,24 @@ namespace MagicTerrain_V2
 			IsLoaded = false;
 			IsVisible = false;
 			
-			if (!IsQueued)
+			ReturnChunk();
+		}
+
+		public async void CreateChunkMesh()
+		{
+			var count = 0;
+			while (ChunkContainer == null)
 			{
-				ReturnChunk();
+				if (count >= 20)
+				{
+					break;
+				}
+				count++;
+				await Task.Yield();
+			}
+			if (ChunkContainer != null)
+			{
+				ChunkContainer.CreateChunkMesh();
 			}
 		}
 	}
