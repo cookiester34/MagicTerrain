@@ -1,10 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using UnityEngine;
 
 namespace MagicTerrain_V2
 {
-	[Serializable]
 	public class Node
 	{
 		private readonly ChunkCore chunkCore;
@@ -32,6 +30,8 @@ namespace MagicTerrain_V2
 		public bool IsDisabled { get; private set; }
 
 		public bool IsVisible { get; private set; }
+		
+		public bool Generating { get; set; }
 
 		private int size;
 

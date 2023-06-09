@@ -25,6 +25,9 @@ namespace MagicTerrain_V2.Jobs
 		[ReadOnly]
 		public float terrainSurface;
 
+		[ReadOnly]
+		public int lodIndex;
+
 		public NativeArray<float> cube;
 		
 		public NativeArray<int> triCount;
@@ -33,60 +36,46 @@ namespace MagicTerrain_V2.Jobs
 		public NativeArray<Vector3> vertices;
 		public NativeArray<int> triangles;
 
-		public NativeArray<Vector3> vertices1;
-		public NativeArray<int> triangles1;
-		
-		public NativeArray<Vector3> vertices2;
-		public NativeArray<int> triangles2;
-		
-		public NativeArray<Vector3> vertices3;
-		public NativeArray<int> triangles3;
-		
-		public NativeArray<Vector3> vertices4;
-		public NativeArray<int> triangles4;
-
 		[BurstCompile]
 		public void Execute()
 		{
-			for (int lodIndex = 0; lodIndex < 5; lodIndex++)
+			var lodIncrement = LodTable[lodIndex];
+
+			// Loop through each "cube" in our terrain.
+			for (var x = 0; x < chunkSize - 1; x += lodIncrement)
+			for (var y = 0; y < chunkSize - 1; y += lodIncrement)
+			for (var z = 0; z < chunkSize - 1; z += lodIncrement)
 			{
-				var lodIncrement = LodTable[lodIndex];
-				
-				// Loop through each "cube" in our terrain.
-				for (var x = 0; x < chunkSize - 1; x+=lodIncrement)
-				for (var y = 0; y < chunkSize - 1; y+=lodIncrement)
-				for (var z = 0; z < chunkSize - 1; z+=lodIncrement)
+				// Create an array of floats representing each corner of a cube and get the value from our terrainMap.
+				for (var i = 0; i < 8; i++)
 				{
-					// Create an array of floats representing each corner of a cube and get the value from our terrainMap.
-					for (var i = 0; i < 8; i++)
-					{
-						var terrain = SampleTerrainMap(new int3(x, y, z) + CornerTable[i] * lodIncrement);
-						cube[i] = terrain;
-					}
-
-					// Pass the value into our MarchCube function.
-					var position = new float3(x, y, z);
-					// Get the configuration index of this cube.
-					// Starting with a configuration of zero, loop through each point in the cube and check if it is below the terrain surface.
-					var cubeIndex = 0;
-					for (var i = 0; i < 8; i++)
-						// If it is, use bit-magic to the set the corresponding bit to 1. So if only the 3rd point in the cube was below
-						// the surface, the bit would look like 00100000, which represents the integer value 32.
-						if (cube[i] > terrainSurface)
-							cubeIndex |= 1 << i;
-
-
-					// If the configuration of this cube is 0 or 255 (completely inside the terrain or completely outside of it) we don't need to do anything.
-					if (cubeIndex is 0 or 255)
-						continue;
-
-					// Loop through the triangles. There are never more than 5 triangles to a cube and only three vertices to a triangle.
-					MarchCube(cubeIndex, position, lodIncrement, lodIndex);
+					var terrain = SampleTerrainMap(new int3(x, y, z) + CornerTable[i] * lodIncrement);
+					cube[i] = terrain;
 				}
+
+				// Pass the value into our MarchCube function.
+				var position = new float3(x, y, z);
+				// Get the configuration index of this cube.
+				// Starting with a configuration of zero, loop through each point in the cube and check if it is below the terrain surface.
+				var cubeIndex = 0;
+				for (var i = 0; i < 8; i++)
+					// If it is, use bit-magic to the set the corresponding bit to 1. So if only the 3rd point in the cube was below
+					// the surface, the bit would look like 00100000, which represents the integer value 32.
+					if (cube[i] > terrainSurface)
+						cubeIndex |= 1 << i;
+
+
+				// If the configuration of this cube is 0 or 255 (completely inside the terrain or completely outside of it) we don't need to do anything.
+				if (cubeIndex is 0 or 255)
+					continue;
+
+				// Loop through the triangles. There are never more than 5 triangles to a cube and only three vertices to a triangle.
+				MarchCube(cubeIndex, position, lodIncrement);
 			}
 		}
 
-		private void MarchCube(int cubeIndex, float3 position, int lodIncrement, int lodIndex)
+		[BurstCompile]
+		private void MarchCube(int cubeIndex, float3 position, int lodIncrement)
 		{
 			var edgeIndex = 0;
 			for (var i = 0; i < 5; i++)
@@ -133,120 +122,41 @@ namespace MagicTerrain_V2.Jobs
 				// Add to our vertices and triangles list and increment the edgeIndex.
 				if (flatShaded)
 				{
-					var vCount = vertCount[lodIndex];
-					var tricount = triCount[lodIndex];
-					switch (lodIndex)
-					{
-						case 0:
-							vertices[vCount] = vertPosition;
-							triangles[tricount] = vCount;
-							break;
-						case 1:
-							vertices1[vCount] = vertPosition;
-							triangles1[tricount] = vCount;
-							break;
-						case 2:
-							vertices2[vCount] = vertPosition;
-							triangles2[tricount] = vCount;
-							break;
-						case 3:
-							vertices3[vCount] = vertPosition;
-							triangles3[tricount] = vCount;
-							break;
-						case 4:
-							vertices4[vCount] = vertPosition;
-							triangles4[tricount] = vCount;
-							break;
-					}
-					vertCount[lodIndex]++;
+					vertices[vertCount[0]] = vertPosition;
+					triangles[triCount[0]] = vertCount[0];
+					vertCount[0]++;
 				}
 				else
 				{
-					var tricount = triCount[lodIndex];
-					switch (lodIndex)
-					{
-						case 0:
-							triangles[tricount] = VertForIndice(vertPosition, lodIndex);
-							break;
-						case 1:
-							triangles1[tricount] = VertForIndice(vertPosition, lodIndex);
-							break;
-						case 2:
-							triangles2[tricount] = VertForIndice(vertPosition, lodIndex);
-							break;
-						case 3:
-							triangles3[tricount] = VertForIndice(vertPosition, lodIndex);
-							break;
-						case 4:
-							triangles4[tricount] = VertForIndice(vertPosition, lodIndex);
-							break;
-					}
+					triangles[triCount[0]] = VertForIndice(vertPosition);
 				}
 
 				edgeIndex++;
-				triCount[lodIndex]++;
+				triCount[0]++;
 			}
 		}
 
+		[BurstCompile]
 		private float SampleTerrainMap(int3 corner)
 		{
 			return terrainMap[corner.x + chunkSize * (corner.y + chunkSize * corner.z)];
 		}
 
-		private int VertForIndice(Vector3 vert, int lodIndex)
+		[BurstCompile]
+		private int VertForIndice(Vector3 vert)
 		{
 			// Loop through all the vertices currently in the vertices list.
-			var vCount = vertCount[lodIndex];
+			var vCount = vertCount[0];
 			for (var index = 0; index < vCount; index++)
 			{
 				// If we find a vert that matches ours, then simply return this index.
-				switch (lodIndex)
-				{
-					case 0:
-						if (vertices[index] == vert) return index;
-						break;
-					case 1:
-						if (vertices1[index] == vert) return index;
-						break;
-					case 2:
-						if (vertices2[index] == vert) return index;
-						break;
-					case 3:
-						if (vertices3[index] == vert) return index;
-						break;
-					case 4:
-						if (vertices4[index] == vert) return index;
-						break;
-				}
+				if (vertices[index] == vert) return index;
 			}
 
 			// If we didn't find a match, add this vert to the list and return last index.
-			switch (lodIndex)
-			{
-				case 0:
-					vertices[vCount] = vert;
-					vertCount[lodIndex]++;
-					return vCount;
-				case 1:
-					vertices1[vCount] = vert;
-					vertCount[lodIndex]++;
-					return vCount;
-				case 2:
-					vertices2[vCount] = vert;
-					vertCount[lodIndex]++;
-					return vCount;
-				case 3:
-					vertices3[vCount] = vert;
-					vertCount[lodIndex]++;
-					return vCount;
-				case 4:
-					vertices4[vCount] = vert;
-					vertCount[lodIndex]++;
-					return vCount;
-			}
-
-			//should never reach this point
-			return 0;
+			vertices[vCount] = vert;
+			vertCount[0]++;
+			return vCount;
 		}
 	}
 }

@@ -62,6 +62,9 @@ namespace MagicTerrain_V2.Saving
 					writer.Write(edit.Key);
 					writer.Write(edit.Value);
 				}
+
+				chunk.node.Chunk = null;
+				Chunks.Remove(key);
 			}
 		}
 

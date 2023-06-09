@@ -3,6 +3,7 @@ using MagicTerrain_V2.Helpers;
 using MagicTerrain_V2.Jobs;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
@@ -37,12 +38,6 @@ namespace MagicTerrain_V2
 
 		[SerializeField]
 		private int chunkContainerStartPoolCount = 100;
-
-		[SerializeField]
-		private int queueUpdateFrequency = 10;
-
-		[SerializeField]
-		private int queueDequeueLimit = 5;
 
 		[SerializeField]
 		internal int octaves = 3;
@@ -117,6 +112,8 @@ namespace MagicTerrain_V2
 
 		private int trueViewDistance;
 
+		private int frameCount;
+
 		private void OnDrawGizmos()
 		{
 			if (!DebugMode) return;
@@ -186,15 +183,14 @@ namespace MagicTerrain_V2
 
 			CheckEditQueues();
 
-			#region ChunkCreationQueue
-
-			queueUpdateCount++;
-			if (queueUpdateCount % queueUpdateFrequency != 0) return;
-			queueUpdateCount = 0;
-
 			CheckGenerateQueues();
 
-			#endregion
+			frameCount++;
+			if (frameCount % 5 <= 0)
+			{
+				frameCount = 0;
+				DequeNodes();
+			}
 		}
 
 		private void CalculateVisibleNodes()
@@ -324,6 +320,7 @@ namespace MagicTerrain_V2
 			return requestedChunk;
 		}
 
+		//This is slow
 		public ChunkContainer RequestChunkContainer(Vector3 position, Node node, Chunk chunk)
 		{
 			ChunkContainer foundContainer = null;
@@ -357,21 +354,7 @@ namespace MagicTerrain_V2
 
 			if (chunk is { Hasdata: false })
 			{
-				node.Chunk.CreateAndQueueTerrainMapJob(
-					node.Position,
-					TrueWorldSize,
-					octaves,
-					weightedStrength,
-					lacunarity,
-					gain,
-					octavesCaves,
-					weightedStrengthCaves,
-					lacunarityCaves,
-					gainCaves,
-					domainWarpAmp,
-					terrainMapSize,
-					seed);
-				generatingNodes.Add(node);
+				queuedNodes.Add(node);
 			}
 			else if (chunk != null)
 			{

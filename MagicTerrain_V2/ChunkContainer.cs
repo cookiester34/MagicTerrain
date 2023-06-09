@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Unity.Burst;
+using UnityEngine;
 
 namespace MagicTerrain_V2
 {

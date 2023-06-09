@@ -1,20 +1,19 @@
 ﻿using MagicTerrain_V2.Jobs;
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
 namespace MagicTerrain_V2
 {
-	[Serializable]
 	public class Chunk
 	{
 		private bool flatShaded;
 
 		private JobHandler jobHandler;
-		private Node node;
+		internal Node node;
 		private bool smoothTerrain;
 		private float terrainSurface;
 
@@ -25,12 +24,6 @@ namespace MagicTerrain_V2
 			this.flatShaded = flatShaded;
 			jobHandler = new JobHandler();
 
-			MeshDataSets = new MeshData[5];
-			for (var i = 0; i < MeshDataSets.Length; i++) MeshDataSets[i] = new MeshData();
-		}
-
-		public Chunk()
-		{
 			MeshDataSets = new MeshData[5];
 			for (var i = 0; i < MeshDataSets.Length; i++) MeshDataSets[i] = new MeshData();
 		}
@@ -53,17 +46,14 @@ namespace MagicTerrain_V2
 			this.node = node;
 		}
 
-		public void BuildMesh()
+		public void BuildMesh(int lodIndex)
 		{
 			Meshes ??= new Mesh[5];
-			for (var index = 0; index < Meshes.Length; index++)
-			{
-				Meshes[index] ??= new Mesh();
-				Meshes[index].Clear();
-				Meshes[index].vertices = MeshDataSets[index].chunkVertices;
-				Meshes[index].triangles = MeshDataSets[index].chunkTriangles;
-				Meshes[index].RecalculateNormals();
-			}
+			Meshes[lodIndex] ??= new Mesh();
+			Meshes[lodIndex].Clear();
+			Meshes[lodIndex].vertices = MeshDataSets[lodIndex].chunkVertices;
+			Meshes[lodIndex].triangles = MeshDataSets[lodIndex].chunkTriangles;
+			Meshes[lodIndex].RecalculateNormals();
 		}
 
 		public void CompressChunkData()
@@ -108,8 +98,7 @@ namespace MagicTerrain_V2
 						CompleteTerrainMapJob(jobHandler.ChunkJob);
 						break;
 					case MeshDataJob:
-						CompleteMeshDataJob(jobHandler.ChunkJob);
-						return true;
+						return CompleteMeshDataJob(jobHandler.ChunkJob);
 				}
 			}
 
@@ -139,7 +128,7 @@ namespace MagicTerrain_V2
 			if (wasEdited)
 			{
 				LocalTerrainMap = editTerrainMapJob.terrainMap.ToArray();
-				CreateAndQueueMeshDataJob();
+				CreateAndQueueMeshDataJob(0);
 			}
 			else
 			{
@@ -192,12 +181,13 @@ namespace MagicTerrain_V2
 			LocalTerrainMap = terrainMapJob.terrainMap.ToArray();
 			UnEditedLocalTerrainMap ??= LocalTerrainMap.ToArray();
 			ApplyChunkEdits();
-			CreateAndQueueMeshDataJob();
+			CreateAndQueueMeshDataJob(0);
 
 			terrainMapJob.terrainMap.Dispose();
 		}
 
-		public void CreateAndQueueMeshDataJob()
+		//This is slow
+		public void CreateAndQueueMeshDataJob(int lodIndex)
 		{
 			var meshDataJob = new MeshDataJob
 			{
@@ -207,91 +197,55 @@ namespace MagicTerrain_V2
 				cube = new NativeArray<float>(8, Allocator.TempJob),
 				smoothTerrain = smoothTerrain,
 				flatShaded = !smoothTerrain || flatShaded,
-				triCount = new NativeArray<int>(5, Allocator.TempJob),
-				vertCount = new NativeArray<int>(5, Allocator.TempJob),
+				triCount = new NativeArray<int>(1, Allocator.TempJob),
+				vertCount = new NativeArray<int>(1, Allocator.TempJob),
 				vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
 				triangles = new NativeArray<int>(900000, Allocator.TempJob),
-				vertices1 = new NativeArray<Vector3>(900000, Allocator.TempJob),
-				triangles1 = new NativeArray<int>(900000, Allocator.TempJob),
-				vertices2 = new NativeArray<Vector3>(900000, Allocator.TempJob),
-				triangles2 = new NativeArray<int>(900000, Allocator.TempJob),
-				vertices3 = new NativeArray<Vector3>(900000, Allocator.TempJob),
-				triangles3 = new NativeArray<int>(900000, Allocator.TempJob),
-				vertices4 = new NativeArray<Vector3>(900000, Allocator.TempJob),
-				triangles4 = new NativeArray<int>(900000, Allocator.TempJob)
+				lodIndex = lodIndex
 			};
 			jobHandler.StartJob(meshDataJob.Schedule(), meshDataJob);
 		}
 
-		public void CompleteMeshDataJob(IChunkJob jobHandlerChunkJob)
+		//This is slow
+		public bool CompleteMeshDataJob(IChunkJob jobHandlerChunkJob)
 		{
 			var meshDataJob = (MeshDataJob)jobHandlerChunkJob;
 
-			//TODO: investigate Null ref here
 			var triCount = meshDataJob.triCount.ToArray();
 			var vertCount = meshDataJob.vertCount.ToArray();
+			var lodIndex = meshDataJob.lodIndex;
 
-			MeshDataSets ??= new MeshData[7];
-			//LOD0
+			MeshDataSets ??= new MeshData[5];
 			var tCount = triCount[0];
-			MeshDataSets[0].chunkTriangles = new int[tCount];
-			for (var i = 0; i < tCount; i++) MeshDataSets[0].chunkTriangles[i] = meshDataJob.triangles[i];
+			MeshDataSets[lodIndex].chunkTriangles = new int[tCount];
+			for (var i = 0; i < tCount; i++) MeshDataSets[lodIndex].chunkTriangles[i] = meshDataJob.triangles[i];
 			var vCount = vertCount[0];
-			MeshDataSets[0].chunkVertices = new Vector3[vCount];
-			for (var i = 0; i < vCount; i++) MeshDataSets[0].chunkVertices[i] = meshDataJob.vertices[i];
+			MeshDataSets[lodIndex].chunkVertices = new Vector3[vCount];
+			for (var i = 0; i < vCount; i++) MeshDataSets[lodIndex].chunkVertices[i] = meshDataJob.vertices[i];
 
-			//LOD1
-			var tCount1 = triCount[1];
-			MeshDataSets[1].chunkTriangles = new int[tCount1];
-			for (var i = 0; i < tCount1; i++) MeshDataSets[1].chunkTriangles[i] = meshDataJob.triangles1[i];
-			var vCount1 = vertCount[1];
-			MeshDataSets[1].chunkVertices = new Vector3[vCount1];
-			for (var i = 0; i < vCount1; i++) MeshDataSets[1].chunkVertices[i] = meshDataJob.vertices1[i];
-
-			//LOD2
-			var tCount2 = triCount[2];
-			MeshDataSets[2].chunkTriangles = new int[tCount2];
-			for (var i = 0; i < tCount2; i++) MeshDataSets[2].chunkTriangles[i] = meshDataJob.triangles2[i];
-			var vCount2 = vertCount[2];
-			MeshDataSets[2].chunkVertices = new Vector3[vCount2];
-			for (var i = 0; i < vCount2; i++) MeshDataSets[2].chunkVertices[i] = meshDataJob.vertices2[i];
-
-			//LOD3
-			var tCount3 = triCount[3];
-			MeshDataSets[3].chunkTriangles = new int[tCount3];
-			for (var i = 0; i < tCount3; i++) MeshDataSets[3].chunkTriangles[i] = meshDataJob.triangles3[i];
-			var vCount3 = vertCount[3];
-			MeshDataSets[3].chunkVertices = new Vector3[vCount3];
-			for (var i = 0; i < vCount3; i++) MeshDataSets[3].chunkVertices[i] = meshDataJob.vertices3[i];
-
-			//LOD4
-			var tCount4 = triCount[4];
-			MeshDataSets[4].chunkTriangles = new int[tCount4];
-			for (var i = 0; i < tCount4; i++) MeshDataSets[4].chunkTriangles[i] = meshDataJob.triangles4[i];
-			var vCount4 = vertCount[4];
-			MeshDataSets[4].chunkVertices = new Vector3[vCount4];
-			for (var i = 0; i < vCount4; i++) MeshDataSets[4].chunkVertices[i] = meshDataJob.vertices4[i];
-
-			BuildMesh();
+			BuildMesh(lodIndex);
 
 			meshDataJob.cube.Dispose();
 			meshDataJob.triCount.Dispose();
 			meshDataJob.vertCount.Dispose();
 			meshDataJob.vertices.Dispose();
 			meshDataJob.triangles.Dispose();
-			meshDataJob.vertices1.Dispose();
-			meshDataJob.triangles1.Dispose();
-			meshDataJob.vertices2.Dispose();
-			meshDataJob.triangles2.Dispose();
-			meshDataJob.vertices3.Dispose();
-			meshDataJob.triangles3.Dispose();
-			meshDataJob.vertices4.Dispose();
-			meshDataJob.triangles4.Dispose();
 			meshDataJob.terrainMap.Dispose();
 
 			node.CreateChunkMesh();
+			if (lodIndex >= 4)
+			{
+				node.Generating = false;
+				if (node.IsDisabled) node.ReturnChunk();
+				return true;
+			}
+			else
+			{
+				CreateAndQueueMeshDataJob(lodIndex + 1);
+			}
 
 			if (node.IsDisabled) node.ReturnChunk();
+			return false;
 		}
 
 		public class MeshData

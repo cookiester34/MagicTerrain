@@ -42,6 +42,9 @@ namespace MagicTerrain_V2.Movment
 		[SerializeField]
 		private float cameraMaxAngle = 65f;
 
+		[SerializeField]
+		private ChunkCore ChunkCore;
+
 		private Rigidbody rigidbody;
 		private PlayerInput playerInput;
 		private InputAction jumpAction;
@@ -90,6 +93,15 @@ namespace MagicTerrain_V2.Movment
 			
 			Cursor.visible = mouseVisible;
 			Cursor.lockState = CursorLockMode.Locked;
+			
+			gameObject.SetActive(false);
+
+			ChunkCore.OnQueuedChunksDone += HandlePlayerActivation;
+		}
+
+		private void HandlePlayerActivation()
+		{
+			gameObject.SetActive(true);
 		}
 
 		private void PerformedSprint(InputAction.CallbackContext context)
