@@ -1,10 +1,11 @@
 ﻿using MagicTerrain_V2.Jobs;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace MagicTerrain_V2
 {
@@ -13,7 +14,6 @@ namespace MagicTerrain_V2
 		private bool flatShaded;
 
 		private JobHandler jobHandler;
-		internal Node node;
 		private bool smoothTerrain;
 		private float terrainSurface;
 
@@ -29,22 +29,23 @@ namespace MagicTerrain_V2
 		}
 
 		public MeshData[] MeshDataSets { get; set; }
-		public float[] LocalTerrainMap { get; set; }
-		public float[] UnEditedLocalTerrainMap { get; set; }
-		public Mesh[] Meshes { get; private set; }
+		public Mesh[] Meshes { get; set; }
 		public bool EditsHaveBeenApplied { get; set; }
 		public bool Hasdata => LocalTerrainMap != null;
 		public Dictionary<int, float> EditedPoints { get; set; } = new();
 		public int ChunkSize { get; set; }
 		public ChunkCore ChunkCore { get; set; }
 		public bool WasEdited { get; set; }
-
 		public bool ForceCompletion { get; private set; }
+		
+		public float[] LocalTerrainMap { get; set; }
+		public float[] UnEditedLocalTerrainMap { get; set; }
 
-		public void AssignNode(Node node)
-		{
-			this.node = node;
-		}
+		public byte[] compressedEditedKeys;
+		public byte[] compressedEditedValues;
+
+		public Action<bool> OnMeshJobDone;
+		public Action OnDispose;
 
 		public void BuildMesh(int lodIndex)
 		{
@@ -58,10 +59,18 @@ namespace MagicTerrain_V2
 
 		public void CompressChunkData()
 		{
+			compressedEditedKeys = EditedPoints.Keys.ToArray().Compress();
+			compressedEditedValues = EditedPoints.Values.ToArray().Compress();
 		}
 
 		public void UncompressChunkData()
 		{
+			var editedKeys = compressedEditedKeys.UncompressIntArray();
+			var editedValues = compressedEditedValues.UncompressFloatArray();
+			for (var index = 0; index < editedKeys.Length; index++)
+			{
+				EditedPoints[editedKeys[index]] = editedValues[index];
+			}
 		}
 
 		public void ApplyChunkEdits()
@@ -179,7 +188,7 @@ namespace MagicTerrain_V2
 		{
 			var terrainMapJob = (TerrainMapJob)jobHandlerChunkJob;
 			LocalTerrainMap = terrainMapJob.terrainMap.ToArray();
-			UnEditedLocalTerrainMap ??= LocalTerrainMap.ToArray();
+			UnEditedLocalTerrainMap = LocalTerrainMap.ToArray();
 			ApplyChunkEdits();
 			CreateAndQueueMeshDataJob(0);
 
@@ -232,19 +241,16 @@ namespace MagicTerrain_V2
 			meshDataJob.triangles.Dispose();
 			meshDataJob.terrainMap.Dispose();
 
-			node.CreateChunkMesh();
 			if (lodIndex >= 4)
 			{
-				node.Generating = false;
-				if (node.IsDisabled) node.ReturnChunk();
+				OnMeshJobDone?.Invoke(true);
 				return true;
 			}
 			else
 			{
 				CreateAndQueueMeshDataJob(lodIndex + 1);
+				OnMeshJobDone?.Invoke(false);
 			}
-
-			if (node.IsDisabled) node.ReturnChunk();
 			return false;
 		}
 
@@ -252,6 +258,25 @@ namespace MagicTerrain_V2
 		{
 			public int[] chunkTriangles;
 			public Vector3[] chunkVertices;
+		}
+
+		public void Dispose()
+		{
+			if (Meshes != null)
+			{
+				foreach (var mesh in Meshes)
+				{
+					Object.Destroy(mesh);
+				}
+
+				Meshes = null;
+			}
+
+			jobHandler.Dispose();
+			jobHandler = null;
+			LocalTerrainMap = null;
+			UnEditedLocalTerrainMap = null;
+			OnDispose?.Invoke();
 		}
 	}
 }

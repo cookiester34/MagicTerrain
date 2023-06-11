@@ -4,7 +4,6 @@ using Unity.Jobs;
 
 namespace MagicTerrain_V2.Helpers
 {
-	[Serializable]
 	public struct ChunkEditJobData
 	{
 		public JobHandle GetCirclePointsJobHandle { get; }
@@ -16,19 +15,6 @@ namespace MagicTerrain_V2.Helpers
 			GetCirclePointsJobHandle = getCirclePointsJobHandle;
 			GetCirclePointsJob = getCirclePointsJob;
 			Add = add;
-		}
-	}
-	
-	[Serializable]
-	public struct EditTerrainMapJobData
-	{
-		public JobHandle EditTerrainMapJobHandle { get; }
-		public EditTerrainMapJob EditTerrainMapJob { get; }
-
-		public EditTerrainMapJobData(JobHandle editTerrainMapJobHandle, EditTerrainMapJob editTerrainMapJob)
-		{
-			EditTerrainMapJobHandle = editTerrainMapJobHandle;
-			EditTerrainMapJob = editTerrainMapJob;
 		}
 	}
 }

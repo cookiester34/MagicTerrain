@@ -102,6 +102,7 @@ namespace MagicTerrain_V2.Movment
 		private void HandlePlayerActivation()
 		{
 			gameObject.SetActive(true);
+			ChunkCore.OnQueuedChunksDone -= HandlePlayerActivation;
 		}
 
 		private void PerformedSprint(InputAction.CallbackContext context)

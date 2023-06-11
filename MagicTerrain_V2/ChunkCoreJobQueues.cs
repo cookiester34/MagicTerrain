@@ -22,10 +22,10 @@ namespace MagicTerrain_V2
 
 		private void DequeNodes()
 		{
-			if (nodeGenerating.Count <= 5)
+			if (nodeGenerating.Count <= 25)
 			{
 				var playerTransformPosition = playerTransform.position;
-				var orderedNodes = queuedNodes.OrderBy(node => Vector3.Distance(node.Position, playerTransformPosition));
+				var orderedNodes = queuedNodes.OrderBy(node => Vector3.Distance(node.Position, playerTransformPosition)).ToArray();
 				foreach (var node in orderedNodes)
 				{
 					queuedChunksAlreadyDone = false;

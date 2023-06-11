@@ -23,6 +23,15 @@ namespace MagicTerrain_V2.Saving
 			this.chunkCore = chunkCore;
 		}
 
+		public void Dispose()
+		{
+			foreach (var (key, chunk) in Chunks)
+			{
+				chunk.Dispose();
+			}
+			Chunks.Clear();
+		}
+
 		public void Serialize(BinaryWriter writer)
 		{
 			//figure out which chunks have been edited
@@ -50,20 +59,27 @@ namespace MagicTerrain_V2.Saving
 			writer.Write(editedChunks.Count);
 			foreach (var (key, chunk) in editedChunks)
 			{
+				chunk.CompressChunkData();
+				
 				// key
 				writer.Write(key.x);
 				writer.Write(key.y);
 				writer.Write(key.z);
 
 				// value
-				writer.Write(chunk.EditedPoints.Count);
-				foreach (var edit in chunk.EditedPoints)
+				writer.Write(chunk.compressedEditedKeys.Length);
+				for (var index = 0; index < chunk.compressedEditedKeys.Length; index++)
 				{
-					writer.Write(edit.Key);
-					writer.Write(edit.Value);
+					writer.Write(chunk.compressedEditedKeys[index]);
 				}
 
-				chunk.node.Chunk = null;
+				writer.Write(chunk.compressedEditedValues.Length);
+				for (var index = 0; index < chunk.compressedEditedValues.Length; index++)
+				{
+					writer.Write(chunk.compressedEditedValues[index]);
+				}
+
+				chunk.Dispose();
 				Chunks.Remove(key);
 			}
 		}
@@ -85,13 +101,23 @@ namespace MagicTerrain_V2.Saving
 				chunk.WasEdited = true;
 				Chunks.Add(key, chunk);
 
-				var editCount = reader.ReadInt32();
-				for (int j = 0; j < editCount; j++)
+				var editKeysCount = reader.ReadInt32();
+				chunk.compressedEditedKeys = new byte[editKeysCount];
+				for (int j = 0; j < editKeysCount; j++)
 				{
-					var index = reader.ReadInt32();
-					var value = reader.ReadSingle();
-					chunk.EditedPoints[index] = value;
+					var index = reader.ReadByte();
+					chunk.compressedEditedKeys[j] = index;
 				}
+
+				var editValuesCount = reader.ReadInt32();
+				chunk.compressedEditedValues = new byte[editValuesCount];
+				for (int j = 0; j < editValuesCount; j++)
+				{
+					var value = reader.ReadByte();
+					chunk.compressedEditedValues[j] = value;
+				}
+				
+				chunk.UncompressChunkData();
 			}
 		}
 	}

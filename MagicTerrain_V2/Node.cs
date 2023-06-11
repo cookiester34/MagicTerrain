@@ -32,11 +32,14 @@ namespace MagicTerrain_V2
 		public bool IsVisible { get; private set; }
 		
 		public bool Generating { get; set; }
+		
+		public Vector3 key { get; }
 
 		private int size;
 
-		public Node(Vector3Int position, Vector3 positionReal, int size, Chunk chunk, ChunkCore chunkCore)
+		public Node(Vector3 key, Vector3Int position, Vector3 positionReal, int size, Chunk chunk, ChunkCore chunkCore)
 		{
+			this.key = key;
 			this.size = size * 2;
 			this.chunkCore = chunkCore;
 			this.Position = position;
@@ -48,19 +51,27 @@ namespace MagicTerrain_V2
 			IsVisible = false;
 			
 			RequestChunk();
+
+			chunk.OnMeshJobDone += HandleMeshJobDone;
+			chunk.OnDispose += DisposeNode;
+		}
+
+		private void HandleMeshJobDone(bool isGenerating)
+		{
+			CreateChunkMesh();
+			Generating = !isGenerating;
+			if (IsDisabled) ReturnChunk();
 		}
 
 		public void RequestChunk()
 		{
 			ChunkContainer = chunkCore.RequestChunkContainer(Position, this, chunk);
 			ChunkContainer.EnableContainer();
-			ChunkContainer.Node = this;
 		}
 
 		public void ReturnChunk()
 		{
 			if (ChunkContainer == null) return;
-			ChunkContainer.Node = null;
 			chunkCore.ReturnChunkContainer(ChunkContainer);
 			ChunkContainer = null;
 		}
@@ -90,7 +101,7 @@ namespace MagicTerrain_V2
 		
 		public bool IsNodeVisible(Plane[] planes)
 		{
-			var nodeBounds = new Bounds(positionReal, Vector3.one * size);
+			var nodeBounds = new Bounds(positionReal, Vector3.one * size); //if planets don't move this can be cached
 			// Check if the renderer is within the view frustum of the camera
 			var visible = GeometryUtility.TestPlanesAABB(planes, nodeBounds);
 			return visible;
@@ -121,6 +132,15 @@ namespace MagicTerrain_V2
 			{
 				ChunkContainer.CreateChunkMesh();
 			}
+		}
+
+		public void DisposeNode()
+		{
+			ReturnChunk();
+			chunkCore.RemoveNode(this);
+			chunk.OnMeshJobDone -= HandleMeshJobDone;
+			chunk.OnDispose -= DisposeNode;
+			Chunk = null;
 		}
 	}
 }

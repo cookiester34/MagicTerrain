@@ -1,5 +1,4 @@
-﻿using Unity.Burst;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace MagicTerrain_V2
 {
@@ -12,8 +11,6 @@ namespace MagicTerrain_V2
 		private MeshFilter meshFilter;
 
 		private Material material;
-
-		public Chunk Chunk { get; private set; }
 		
 		public Node Node { get; set; }
 
@@ -55,16 +52,15 @@ namespace MagicTerrain_V2
 			meshRenderer.enabled = true;
 		}
 
-		public void AssignChunk(Chunk newChunk, Material material)
+		public void AssignMaterial(Material material)
 		{
 			this.material = material;
-			Chunk = newChunk;
 			IsUsed = true;
 		}
 
 		public void UnAssignChunk()
 		{
-			Chunk = null;
+			Node = null;
 			IsUsed = false;
 			CheckContainerHasComponents();
 			meshFilter.sharedMesh = null;
@@ -73,21 +69,23 @@ namespace MagicTerrain_V2
 
 		public void CreateChunkMesh()
 		{
-			if (Chunk?.Meshes == null) return;
-			if (Chunk.Meshes.Length == 0) return;
+			var nodeChunk = Node.Chunk;
+			if (nodeChunk?.Meshes == null) return;
+			if (nodeChunk.Meshes.Length == 0) return;
 			CheckContainerHasComponents();
 			meshRenderer.material = material;
-			meshFilter.sharedMesh = Chunk.Meshes[LodIndex];
-			meshCollider.sharedMesh = Chunk.Meshes[LodIndex];
+			meshFilter.sharedMesh = nodeChunk.Meshes[LodIndex];
+			meshCollider.sharedMesh = nodeChunk.Meshes[LodIndex];
 		}
 
 		private void UpdateMeshLod()
 		{
-			if (Chunk?.Meshes == null) return;
-			if (Chunk.Meshes.Length == 0) return;
+			var nodeChunk = Node.Chunk;
+			if (nodeChunk?.Meshes == null) return;
+			if (nodeChunk.Meshes.Length == 0) return;
 			CheckContainerHasComponents();
-			meshFilter.sharedMesh = Chunk.Meshes[LodIndex];
-			meshCollider.sharedMesh = Chunk.Meshes[LodIndex];
+			meshFilter.sharedMesh = nodeChunk.Meshes[LodIndex];
+			meshCollider.sharedMesh = nodeChunk.Meshes[LodIndex];
 		}
 
 		private void CheckContainerHasComponents()

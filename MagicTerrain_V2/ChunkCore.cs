@@ -3,7 +3,6 @@ using MagicTerrain_V2.Helpers;
 using MagicTerrain_V2.Jobs;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
@@ -85,11 +84,10 @@ namespace MagicTerrain_V2
 
 		private Vector3 lastPlayerPosition;
 
-		private Vector3 lastChunkSavePosition;
-
 		private int queueUpdateCount;
 
-		private readonly Dictionary<Vector3, Node> nodes = new();
+		internal readonly Dictionary<Vector3, Node> nodes = new();
+		internal readonly HashSet<Node> nodesToRemove = new();
 
 		private readonly List<ChunkContainer> chunkContainers = new();
 
@@ -133,6 +131,15 @@ namespace MagicTerrain_V2
 		//probably wont to move this somewhere else later on
 		private void Awake()
 		{
+			for (var i = 0; i < chunkContainerStartPoolCount; i++)
+			{
+				var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
+				requestedChunkContainer.ChunkCore = this;
+				requestedChunkContainer.transform.position = Vector3.zero;
+				chunkContainers.Add(requestedChunkContainer);
+				requestedChunkContainer.gameObject.SetActive(false);
+			}
+			
 			ChunkSetSaveLoadSystem.InitializeChunkSetSaveLoadSystem(chunkSetSize * chunkSize);
 			var roundVectorDownToNearestChunkSet = ChunkSetSaveLoadSystem.RoundVectorDownToNearestChunkSet(playerTransform.position);
 			if (!ChunkSetSaveLoadSystem.TryLoadChunkSet(this, roundVectorDownToNearestChunkSet))
@@ -145,35 +152,24 @@ namespace MagicTerrain_V2
 		{
 			base.Start();
 			lastPlayerPosition = playerTransform.position;
-			lastChunkSavePosition = playerTransform.position;
 			trueIgnoreCullDistance = ignoreFrustrumCullDistance * chunkSize;
 			trueViewDistance = viewDistance * chunkSize;
-
-			for (var i = 0; i < chunkContainerStartPoolCount; i++)
-			{
-				var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
-				requestedChunkContainer.ChunkCore = this;
-				requestedChunkContainer.transform.position = Vector3.zero;
-				chunkContainers.Add(requestedChunkContainer);
-				requestedChunkContainer.gameObject.SetActive(false);
-			}
 
 			var chunkSizeDoubled = chunkSize * 2;
 			terrainMapSize = chunkSizeDoubled * chunkSizeDoubled * chunkSize;
 		}
 
-		private void FixedUpdate()
+		private void Update()
 		{
 			ManageQueues();
 
 			CalculateVisibleNodes();
 
-			var playerTransformPosition = playerTransform.position;
-			var distance = Vector3.Distance(playerTransformPosition, lastChunkSavePosition);
-			if (distance <= viewDistance)
+			foreach (var node in nodesToRemove.ToArray())
 			{
-				lastChunkSavePosition = playerTransformPosition;
-				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(lastPlayerPosition, trueViewDistance);
+				if (!node.Generating) continue;
+				nodes.Remove(node.key);
+				nodesToRemove.Remove(node);
 			}
 		}
 
@@ -206,6 +202,8 @@ namespace MagicTerrain_V2
 			var distance = Vector3.Distance(lastPlayerPosition, playerPosition);
 			if (distance >= updateDistance || forceUpdate)
 			{
+				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(lastPlayerPosition, trueViewDistance);
+				
 				planetRotationLastUpdate = transform.rotation;
 				lastPlayerPosition = playerPosition;
 				forceUpdate = false;
@@ -238,8 +236,7 @@ namespace MagicTerrain_V2
 					{
 						var chunkPosition = new Vector3Int(x, y, z);
 						var requestChunk = RequestChunk(chunkPosition);
-						var node = new Node(chunkPosition, realPosition, chunkSize, requestChunk, this);
-						requestChunk.AssignNode(node);
+						var node = new Node(position, chunkPosition, realPosition, chunkSize, requestChunk, this);
 						nodes.Add(position, node);
 					}
 					else
@@ -253,7 +250,7 @@ namespace MagicTerrain_V2
 				foreach (var position in lastVisibleNodes)
 				{
 					if (VisiblePositions.Contains(position)) continue;
-					nodes[position].Disable();
+					if (nodes.ContainsKey(position)) nodes[position].Disable();
 				}
 
 				FrustrumCullVisibleNodes();
@@ -308,6 +305,18 @@ namespace MagicTerrain_V2
 				node.EnableNode();
 			}
 		}
+		
+		public void RemoveNode(Node node)
+		{
+			if (!node.Generating)
+			{
+				nodes.Remove(node.key);
+			}
+			else
+			{
+				nodesToRemove.Add(node);
+			}
+		}
 
 		private Chunk RequestChunk(Vector3Int position)
 		{
@@ -334,32 +343,41 @@ namespace MagicTerrain_V2
 
 			if (foundContainer != null)
 			{
-				SetupChunkContainer(position, node, chunk, foundContainer);
+				foundContainer.Node = node;
+				if (chunk is { Hasdata: false })
+				{
+					queuedNodes.Add(node);
+				}
+				else
+				{
+					foundContainer.CreateChunkMesh();
+				}
+				SetupChunkContainer(position, foundContainer);
 				return foundContainer;
 			}
 
 			var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
 			requestedChunkContainer.ChunkCore = this;
 			
-			SetupChunkContainer(position, node, chunk, requestedChunkContainer);
+			requestedChunkContainer.Node = node;
+			if (chunk is { Hasdata: false })
+			{
+				queuedNodes.Add(node);
+			}
+			else
+			{
+				requestedChunkContainer.CreateChunkMesh();
+			}
+			SetupChunkContainer(position, requestedChunkContainer);
 
 			chunkContainers.Add(requestedChunkContainer);
 			return requestedChunkContainer;
 		}
 
-		private void SetupChunkContainer(Vector3 position, Node node, Chunk chunk, ChunkContainer foundContainer)
+		private void SetupChunkContainer(Vector3 position, ChunkContainer foundContainer)
 		{
-			foundContainer.AssignChunk(chunk, coreMaterial);
+			foundContainer.AssignMaterial(coreMaterial);
 			foundContainer.transform.localPosition = position;
-
-			if (chunk is { Hasdata: false })
-			{
-				queuedNodes.Add(node);
-			}
-			else if (chunk != null)
-			{
-				foundContainer.CreateChunkMesh();
-			}
 
 			foundContainer.gameObject.SetActive(true);
 		}

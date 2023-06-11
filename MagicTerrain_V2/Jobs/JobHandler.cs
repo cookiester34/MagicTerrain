@@ -31,5 +31,10 @@ namespace MagicTerrain_V2.Jobs
 
 			return JobHandle.IsCompleted;
 		}
+
+		public void Dispose()
+		{
+			ChunkJob = null;
+		}
 	}
 }

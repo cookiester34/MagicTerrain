@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using UnityEngine;
 
 public static class ChunkSetSaveLoadSystem
@@ -74,8 +75,7 @@ public static class ChunkSetSaveLoadSystem
 
 	public static void SaveOutOfRangeChunkSets(Vector3 playerPosition, float viewDistance)
 	{
-		return;
-		var range = viewDistance * 1.5f;
+		var range = chunkSetSize;
 		List<Vector3Int> keysToRemove = new();
 		foreach (var (key, chunkSet) in ChunkSets)
 		{
@@ -87,8 +87,8 @@ public static class ChunkSetSaveLoadSystem
 			using var writer = new BinaryWriter(file);
 			chunkSet.Serialize(writer);
 			writer.Flush();
-
 			file.Close();
+			keysToRemove.Add(key);
 		}
 
 		foreach (var key in keysToRemove)
