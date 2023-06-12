@@ -77,10 +77,12 @@ namespace MagicTerrain_V2
 		{
 			if (EditsHaveBeenApplied) return;
 			foreach (var editedPoint in EditedPoints)
+			{
 				if (editedPoint.Key >= 0 && editedPoint.Key < LocalTerrainMap.Length)
 					LocalTerrainMap[editedPoint.Key] = editedPoint.Value;
 				else
 					Debug.Log(editedPoint.Key);
+			}
 			EditsHaveBeenApplied = true;
 		}
 
@@ -184,6 +186,7 @@ namespace MagicTerrain_V2
 			jobHandler.StartJob(terrainMapJob.Schedule(ChunkSize + 1, 244), terrainMapJob);
 		}
 
+		//TODO: Memory leak the arrays never get GC'd
 		public void CompleteTerrainMapJob(IChunkJob jobHandlerChunkJob)
 		{
 			var terrainMapJob = (TerrainMapJob)jobHandlerChunkJob;
@@ -191,7 +194,7 @@ namespace MagicTerrain_V2
 			UnEditedLocalTerrainMap = LocalTerrainMap.ToArray();
 			ApplyChunkEdits();
 			CreateAndQueueMeshDataJob(0);
-
+			OnMeshJobDone?.Invoke(true);
 			terrainMapJob.terrainMap.Dispose();
 		}
 
@@ -208,8 +211,9 @@ namespace MagicTerrain_V2
 				flatShaded = !smoothTerrain || flatShaded,
 				triCount = new NativeArray<int>(1, Allocator.TempJob),
 				vertCount = new NativeArray<int>(1, Allocator.TempJob),
-				vertices = new NativeArray<Vector3>(900000, Allocator.TempJob),
-				triangles = new NativeArray<int>(900000, Allocator.TempJob),
+				//max number of triangles: 21845 and vertices: 65535
+				vertices = new NativeArray<Vector3>(65535, Allocator.TempJob),
+				triangles = new NativeArray<int>(21845, Allocator.TempJob),
 				lodIndex = lodIndex
 			};
 			jobHandler.StartJob(meshDataJob.Schedule(), meshDataJob);
@@ -219,12 +223,14 @@ namespace MagicTerrain_V2
 		public bool CompleteMeshDataJob(IChunkJob jobHandlerChunkJob)
 		{
 			var meshDataJob = (MeshDataJob)jobHandlerChunkJob;
+			meshDataJob.cube.Dispose();
+			meshDataJob.terrainMap.Dispose();
 
 			var triCount = meshDataJob.triCount.ToArray();
 			var vertCount = meshDataJob.vertCount.ToArray();
 			var lodIndex = meshDataJob.lodIndex;
 
-			MeshDataSets ??= new MeshData[5];
+			MeshDataSets ??= new MeshData[4];
 			var tCount = triCount[0];
 			MeshDataSets[lodIndex].chunkTriangles = new int[tCount];
 			for (var i = 0; i < tCount; i++) MeshDataSets[lodIndex].chunkTriangles[i] = meshDataJob.triangles[i];
@@ -234,14 +240,13 @@ namespace MagicTerrain_V2
 
 			BuildMesh(lodIndex);
 
-			meshDataJob.cube.Dispose();
+			
 			meshDataJob.triCount.Dispose();
 			meshDataJob.vertCount.Dispose();
 			meshDataJob.vertices.Dispose();
 			meshDataJob.triangles.Dispose();
-			meshDataJob.terrainMap.Dispose();
 
-			if (lodIndex >= 4)
+			if (lodIndex >= 3)
 			{
 				OnMeshJobDone?.Invoke(true);
 				return true;
@@ -276,6 +281,10 @@ namespace MagicTerrain_V2
 			jobHandler = null;
 			LocalTerrainMap = null;
 			UnEditedLocalTerrainMap = null;
+			compressedEditedKeys = null;
+			compressedEditedValues = null;
+			MeshDataSets = null;
+			OnMeshJobDone = null;
 			OnDispose?.Invoke();
 		}
 	}

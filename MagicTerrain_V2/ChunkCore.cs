@@ -86,8 +86,8 @@ namespace MagicTerrain_V2
 
 		private int queueUpdateCount;
 
-		internal readonly Dictionary<Vector3, Node> nodes = new();
-		internal readonly HashSet<Node> nodesToRemove = new();
+		private readonly Dictionary<Vector3, Node> nodes = new();
+		private readonly HashSet<Node> nodesToRemove = new();
 
 		private readonly List<ChunkContainer> chunkContainers = new();
 
@@ -294,11 +294,8 @@ namespace MagicTerrain_V2
 					case <200:
 						node.SetLodIndex(2);
 						break;
-					case <250:
-						node.SetLodIndex(3);
-						break;
 					default:
-						node.SetLodIndex(4);
+						node.SetLodIndex(3);
 						break;
 				}
 
@@ -329,49 +326,29 @@ namespace MagicTerrain_V2
 			return requestedChunk;
 		}
 
-		//This is slow
 		public ChunkContainer RequestChunkContainer(Vector3 position, Node node, Chunk chunk)
 		{
 			ChunkContainer foundContainer = null;
-			foreach (var chunkContainer in chunkContainers)
+			if (chunkContainers.Count > 0)
 			{
-				if (chunkContainer.IsUsed) continue;
-				foundContainer = chunkContainer;
+				foundContainer = chunkContainers[0];
+				chunkContainers.Remove(foundContainer);
 			}
+			foundContainer ??= Instantiate(chunkContainerPrefab, transform);
 
 			chunk.ChunkCore = this;
-
-			if (foundContainer != null)
-			{
-				foundContainer.Node = node;
-				if (chunk is { Hasdata: false })
-				{
-					queuedNodes.Add(node);
-				}
-				else
-				{
-					foundContainer.CreateChunkMesh();
-				}
-				SetupChunkContainer(position, foundContainer);
-				return foundContainer;
-			}
-
-			var requestedChunkContainer = Instantiate(chunkContainerPrefab, transform);
-			requestedChunkContainer.ChunkCore = this;
-			
-			requestedChunkContainer.Node = node;
+			foundContainer.Node = node;
 			if (chunk is { Hasdata: false })
 			{
 				queuedNodes.Add(node);
 			}
 			else
 			{
-				requestedChunkContainer.CreateChunkMesh();
+				foundContainer.CreateChunkMesh();
 			}
-			SetupChunkContainer(position, requestedChunkContainer);
 
-			chunkContainers.Add(requestedChunkContainer);
-			return requestedChunkContainer;
+			SetupChunkContainer(position, foundContainer);
+			return foundContainer;
 		}
 
 		private void SetupChunkContainer(Vector3 position, ChunkContainer foundContainer)
@@ -386,6 +363,7 @@ namespace MagicTerrain_V2
 		{
 			chunkContainer.DisableContainer();
 			chunkContainer.UnAssignChunk();
+			chunkContainers.Add(chunkContainer);
 		}
 
 		public void EditNode(Node node, Vector3 hitPoint, float radius, bool add)
