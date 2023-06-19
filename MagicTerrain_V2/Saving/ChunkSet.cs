@@ -38,7 +38,6 @@ namespace MagicTerrain_V2.Saving
 			Dictionary<Vector3Int, Chunk> editedChunks = new();
 			foreach (var (key, chunk) in Chunks)
 			{
-				var wasEdited = false;
 				if (chunk.UnEditedLocalTerrainMap != null)
 				{
 					for (int i = 0; i < chunk.UnEditedLocalTerrainMap.Length; i++)
@@ -48,19 +47,15 @@ namespace MagicTerrain_V2.Saving
 						if (nonEditedValue == editedValue) continue;
 
 						chunk.EditedPoints[i] = editedValue;
-						wasEdited = true;
 					}
 				}
-				if (wasEdited)
-				{
-					editedChunks[key] = chunk;
-				}
+				editedChunks[key] = chunk;
 			}
 			writer.Write(editedChunks.Count);
 			foreach (var (key, chunk) in editedChunks)
 			{
 				chunk.CompressChunkData();
-				
+
 				// key
 				writer.Write(key.x);
 				writer.Write(key.y);
@@ -116,7 +111,7 @@ namespace MagicTerrain_V2.Saving
 					var value = reader.ReadByte();
 					chunk.compressedEditedValues[j] = value;
 				}
-				
+
 				chunk.UncompressChunkData();
 			}
 		}

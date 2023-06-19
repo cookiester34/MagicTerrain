@@ -10,8 +10,8 @@ namespace MagicTerrain_V2
 
 		private MeshFilter meshFilter;
 
-		private Material material;
-		
+		internal Material material;
+
 		public Node Node { get; set; }
 
 		public bool IsUsed { get; set; }
@@ -30,7 +30,7 @@ namespace MagicTerrain_V2
 				if (lodIndex != value)
 				{
 					lodIndex = value;
-					UpdateMeshLod();
+					CreateChunkMesh();
 				}
 			}
 		}
@@ -52,12 +52,6 @@ namespace MagicTerrain_V2
 			meshRenderer.enabled = true;
 		}
 
-		public void AssignMaterial(Material material)
-		{
-			this.material = material;
-			IsUsed = true;
-		}
-
 		public void UnAssignChunk()
 		{
 			Node = null;
@@ -73,17 +67,6 @@ namespace MagicTerrain_V2
 			if (nodeChunk?.Meshes == null) return;
 			if (nodeChunk.Meshes.Length == 0) return;
 			CheckContainerHasComponents();
-			meshRenderer.material = material;
-			meshFilter.sharedMesh = nodeChunk.Meshes[LodIndex];
-			meshCollider.sharedMesh = nodeChunk.Meshes[LodIndex];
-		}
-
-		private void UpdateMeshLod()
-		{
-			var nodeChunk = Node.Chunk;
-			if (nodeChunk?.Meshes == null) return;
-			if (nodeChunk.Meshes.Length == 0) return;
-			CheckContainerHasComponents();
 			meshFilter.sharedMesh = nodeChunk.Meshes[LodIndex];
 			meshCollider.sharedMesh = nodeChunk.Meshes[LodIndex];
 		}
@@ -91,6 +74,7 @@ namespace MagicTerrain_V2
 		private void CheckContainerHasComponents()
 		{
 			if (meshRenderer == null) meshRenderer = gameObject.AddComponent<MeshRenderer>();
+			if (meshRenderer.material != material) meshRenderer.material = material;
 			if (meshCollider == null) meshCollider = gameObject.AddComponent<MeshCollider>();
 			if (meshFilter == null) meshFilter = gameObject.AddComponent<MeshFilter>();
 		}

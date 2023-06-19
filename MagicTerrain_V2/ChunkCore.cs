@@ -112,6 +112,8 @@ namespace MagicTerrain_V2
 
 		private int frameCount;
 
+		private bool stopEverything;
+
 		private void OnDrawGizmos()
 		{
 			if (!DebugMode) return;
@@ -139,7 +141,7 @@ namespace MagicTerrain_V2
 				chunkContainers.Add(requestedChunkContainer);
 				requestedChunkContainer.gameObject.SetActive(false);
 			}
-			
+
 			ChunkSetSaveLoadSystem.InitializeChunkSetSaveLoadSystem(chunkSetSize * chunkSize);
 			var roundVectorDownToNearestChunkSet = ChunkSetSaveLoadSystem.RoundVectorDownToNearestChunkSet(playerTransform.position);
 			if (!ChunkSetSaveLoadSystem.TryLoadChunkSet(this, roundVectorDownToNearestChunkSet))
@@ -161,16 +163,16 @@ namespace MagicTerrain_V2
 
 		private void Update()
 		{
-			ManageQueues();
-
-			CalculateVisibleNodes();
-
 			foreach (var node in nodesToRemove.ToArray())
 			{
 				if (!node.Generating) continue;
 				nodes.Remove(node.key);
 				nodesToRemove.Remove(node);
 			}
+
+			CalculateVisibleNodes();
+
+			ManageQueues();
 		}
 
 		private void ManageQueues()
@@ -203,7 +205,7 @@ namespace MagicTerrain_V2
 			if (distance >= updateDistance || forceUpdate)
 			{
 				ChunkSetSaveLoadSystem.SaveOutOfRangeChunkSets(lastPlayerPosition, trueViewDistance);
-				
+
 				planetRotationLastUpdate = transform.rotation;
 				lastPlayerPosition = playerPosition;
 				forceUpdate = false;
@@ -272,7 +274,7 @@ namespace MagicTerrain_V2
 					node.EnableNode();
 					continue;
 				}
-				
+
 				var distance = Vector3.Distance(playerTransform.position, node.PositionReal);
 				if (!node.IsNodeVisible(cameraPlanes))
 				{
@@ -289,20 +291,20 @@ namespace MagicTerrain_V2
 						node.SetLodIndex(0);
 						break;
 					case <150:
-						node.SetLodIndex(1);
+						node.SetLodIndex(0);
 						break;
 					case <200:
-						node.SetLodIndex(2);
+						node.SetLodIndex(0);
 						break;
 					default:
-						node.SetLodIndex(3);
+						node.SetLodIndex(0);
 						break;
 				}
 
 				node.EnableNode();
 			}
 		}
-		
+
 		public void RemoveNode(Node node)
 		{
 			if (!node.Generating)
@@ -335,6 +337,7 @@ namespace MagicTerrain_V2
 				chunkContainers.Remove(foundContainer);
 			}
 			foundContainer ??= Instantiate(chunkContainerPrefab, transform);
+			foundContainer.material = coreMaterial;
 
 			chunk.ChunkCore = this;
 			foundContainer.Node = node;
@@ -353,9 +356,8 @@ namespace MagicTerrain_V2
 
 		private void SetupChunkContainer(Vector3 position, ChunkContainer foundContainer)
 		{
-			foundContainer.AssignMaterial(coreMaterial);
+			foundContainer.IsUsed = true;
 			foundContainer.transform.localPosition = position;
-
 			foundContainer.gameObject.SetActive(true);
 		}
 
@@ -383,19 +385,19 @@ namespace MagicTerrain_V2
 
 			var ceilToInt = Mathf.CeilToInt(radius) * 2 + 1;
 			var arraySize = ceilToInt * ceilToInt * ceilToInt;
-			
+
 			if (arraySize <= 0)
 			{
 				return;
 			}
-			
+
 			hitPoint = transform.worldToLocalMatrix.MultiplyPoint(hitPoint);
 			hitPoint -= node.Position;
-			
+
 			var getCirclePointsJob = GetCirclePointJobs(new Vector3Int((int)hitPoint.x, (int)hitPoint.y, (int)hitPoint.z), arraySize, radius, add);
 			var jobHandle = getCirclePointsJob.Schedule();
 			queuedNodesCirclePoints.Add(node, new ChunkEditJobData(jobHandle, getCirclePointsJob, add));
-			
+
 			JobHandle.ScheduleBatchedJobs();
 		}
 

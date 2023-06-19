@@ -37,7 +37,7 @@ namespace MagicTerrain_V2
 		public ChunkCore ChunkCore { get; set; }
 		public bool WasEdited { get; set; }
 		public bool ForceCompletion { get; private set; }
-		
+
 		public float[] LocalTerrainMap { get; set; }
 		public float[] UnEditedLocalTerrainMap { get; set; }
 
@@ -240,22 +240,22 @@ namespace MagicTerrain_V2
 
 			BuildMesh(lodIndex);
 
-			
+
 			meshDataJob.triCount.Dispose();
 			meshDataJob.vertCount.Dispose();
 			meshDataJob.vertices.Dispose();
 			meshDataJob.triangles.Dispose();
 
-			if (lodIndex >= 3)
-			{
+			// if (lodIndex >= 3)
+			// {
 				OnMeshJobDone?.Invoke(true);
 				return true;
-			}
-			else
-			{
-				CreateAndQueueMeshDataJob(lodIndex + 1);
-				OnMeshJobDone?.Invoke(false);
-			}
+			// }
+			// else
+			// {
+			// 	CreateAndQueueMeshDataJob(lodIndex + 1);
+			// 	OnMeshJobDone?.Invoke(false);
+			// }
 			return false;
 		}
 

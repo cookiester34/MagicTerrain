@@ -32,8 +32,34 @@ namespace MagicTerrain_V2.Jobs
 			return JobHandle.IsCompleted;
 		}
 
+		public void ForceCompletion()
+		{
+			if (!IsInProcess) return;
+			JobHandle.Complete();
+			switch (ChunkJob)
+			{
+				case EditTerrainMapJob editTerrainMapJob:
+					editTerrainMapJob.terrainMap.Dispose();
+					editTerrainMapJob.wasEdited.Dispose();
+					editTerrainMapJob.points.Dispose();
+					break;
+				case TerrainMapJob terrainMapJob:
+					terrainMapJob.terrainMap.Dispose();
+					break;
+				case MeshDataJob meshDataJob:
+					meshDataJob.cube.Dispose();
+					meshDataJob.terrainMap.Dispose();
+					meshDataJob.triCount.Dispose();
+					meshDataJob.vertCount.Dispose();
+					meshDataJob.vertices.Dispose();
+					meshDataJob.triangles.Dispose();
+					break;
+			}
+		}
+
 		public void Dispose()
 		{
+			ForceCompletion();
 			ChunkJob = null;
 		}
 	}

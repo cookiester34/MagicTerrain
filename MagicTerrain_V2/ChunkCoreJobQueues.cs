@@ -12,7 +12,7 @@ namespace MagicTerrain_V2
 
 		private HashSet<Node> queuedNodes = new();
 		private List<Node> nodeGenerating = new();
-		
+
 		private HashSet<Node> generatingNodes = new();
 		private HashSet<Node> editingNodes = new();
 		private readonly Dictionary<Node, ChunkEditJobData> queuedNodesCirclePoints = new();
@@ -30,23 +30,26 @@ namespace MagicTerrain_V2
 				{
 					queuedChunksAlreadyDone = false;
 					if (nodeGenerating.Count > 20) break;
-					nodeGenerating.Add(node);
-					node.Chunk.CreateAndQueueTerrainMapJob(
-						node.Position,
-						TrueWorldSize,
-						octaves,
-						weightedStrength,
-						lacunarity,
-						gain,
-						octavesCaves,
-						weightedStrengthCaves,
-						lacunarityCaves,
-						gainCaves,
-						domainWarpAmp,
-						terrainMapSize,
-						seed);
-					generatingNodes.Add(node);
-					node.Generating = true;
+					if (node.Chunk != null)
+					{
+						nodeGenerating.Add(node);
+						node.Chunk.CreateAndQueueTerrainMapJob(
+							node.Position,
+							TrueWorldSize,
+							octaves,
+							weightedStrength,
+							lacunarity,
+							gain,
+							octavesCaves,
+							weightedStrengthCaves,
+							lacunarityCaves,
+							gainCaves,
+							domainWarpAmp,
+							terrainMapSize,
+							seed);
+						generatingNodes.Add(node);
+						node.Generating = true;
+					}
 					queuedNodes.Remove(node);
 				}
 			}
@@ -137,7 +140,7 @@ namespace MagicTerrain_V2
 				editingNodes.Remove(node);
 			}
 		}
-		
+
 		public void CheckGenerateQueues()
 		{
 			List<Node> nodesToRemove = new();
