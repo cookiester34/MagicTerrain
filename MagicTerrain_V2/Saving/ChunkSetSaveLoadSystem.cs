@@ -74,7 +74,7 @@ public static class ChunkSetSaveLoadSystem
 
 	public static void SaveOutOfRangeChunkSets(Vector3 playerPosition, float viewDistance)
 	{
-		var range = chunkSetSize * 2f;
+		var range = viewDistance * 2.5f;
 		List<Vector3Int> keysToRemove = new();
 		foreach (var (key, chunkSet) in ChunkSets)
 		{

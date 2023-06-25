@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
-namespace MagicTerrain_V2.Saving
+namespace TerrainBakery.Saving
 {
 	[Serializable]
 	public struct ChunkSet
@@ -12,31 +13,53 @@ namespace MagicTerrain_V2.Saving
 		private Vector3Int chunkSetPosition;
 		public Vector3Int ChunkSetPosition => chunkSetPosition;
 
-		public Dictionary<Vector3Int, Chunk> Chunks { get; }
+		private ChunkSetSaveLoadSystem saveLoadSystem;
+		private bool setIsInactive;
+		private bool readyToBeUnloaded;
+		private Dictionary<Vector3Int, Chunk> chunks { get; }
 
-		private ChunkCore chunkCore;
-
-		public ChunkSet(Vector3Int chunkSetPosition, ChunkCore chunkCore)
+		public ChunkSet(Vector3Int chunkSetPosition, ChunkSetSaveLoadSystem saveLoadSystem)
 		{
-			Chunks = new();
+			this.saveLoadSystem = saveLoadSystem;
+			chunks = new();
 			this.chunkSetPosition = chunkSetPosition;
-			this.chunkCore = chunkCore;
+			readyToBeUnloaded = false;
+			setIsInactive = false;
+		}
+
+		public Chunk RequestChunk(Vector3Int chunkPosition)
+		{
+			if (chunks.TryGetValue(chunkPosition, out var chunk))
+				return chunk;
+			var newChunk = saveLoadSystem.RequestChunkFromPool();
+			chunks.Add(chunkPosition, newChunk);
+			return newChunk;
+		}
+
+		public bool CanBeUnloaded()
+		{
+			foreach (var chunk in chunks)
+			{
+				if (chunk.Value.IsActive) return false;
+			}
+
+			return true;
 		}
 
 		public void Dispose()
 		{
-			foreach (var (_, chunk) in Chunks)
+			foreach (var (_, chunk) in chunks)
 			{
-				chunk.Dispose();
+				saveLoadSystem.ReturnChunkToPool(chunk);
 			}
-			Chunks.Clear();
+			chunks.Clear();
 		}
 
 		public void Serialize(BinaryWriter writer)
 		{
 			//figure out which chunks have been edited
 			Dictionary<Vector3Int, Chunk> editedChunks = new();
-			foreach (var (key, chunk) in Chunks)
+			foreach (var (key, chunk) in chunks)
 			{
 				if (chunk.UnEditedLocalTerrainMap != null)
 				{
@@ -89,10 +112,13 @@ namespace MagicTerrain_V2.Saving
 				var z = reader.ReadInt32();
 
 				var key = new Vector3Int(x, y, z);
-				var chunk = new Chunk(ChunkCore.TERRAIN_SURFACE, chunkCore.smoothTerrain, chunkCore.flatShaded);
-				chunk.ChunkSize = chunkCore.chunkSize;
+
+				var chunk = saveLoadSystem.RequestChunkFromPool();
+				chunks.Add(key, chunk);
+				
+				// var chunk = new Chunk(ChunkCore.TERRAIN_SURFACE, chunkCore.smoothTerrain, chunkCore.flatShaded);
+				// chunk.ChunkSize = chunkCore.chunkSize;
 				chunk.WasEdited = true;
-				Chunks.Add(key, chunk);
 
 				var editKeysCount = reader.ReadInt32();
 				chunk.compressedEditedKeys = new byte[editKeysCount];

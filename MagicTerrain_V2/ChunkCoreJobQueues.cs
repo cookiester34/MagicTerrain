@@ -146,7 +146,7 @@ namespace MagicTerrain_V2
 			List<Node> nodesToRemove = new();
 			foreach (var generateNode in generatingNodes)
 			{
-				if (generateNode.Chunk.CheckJobComplete())
+				if (generateNode.Chunk ==  null || generateNode.Chunk.CheckJobComplete())
 				{
 					nodesToRemove.Add(generateNode);
 				}

@@ -1,23 +1,55 @@
-﻿using MagicTerrain_V2.Jobs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TerrainBakery.Helpers;
+using TerrainBakery.Jobs;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace MagicTerrain_V2
+namespace TerrainBakery
 {
+	[Serializable]
 	public class Chunk
 	{
-		private bool flatShaded;
 		private JobHandler jobHandler;
+		private bool flatShaded;
 		private bool smoothTerrain;
 		private float terrainSurface;
+		private int chunkSize;
+		private int terrainMapSize;
+		
+		public ChunkContainer ChunkContainer { get; set; }
+		public Vector3Int Position { get; set; }
+		public Vector3 PositionReal { get; set; }
+		
+		private MeshData[] MeshDataSets { get; set; }
+		internal Mesh[] Meshes { get; set; }
+		
+		private bool ForceCompletion { get; set; }
+		private bool EditsHaveBeenApplied { get; set; }
 
-		public Chunk(float terrainSurface, bool smoothTerrain, bool flatShaded)
+		public bool WasEdited { get; set; }
+		public bool IsActive { get; set; }
+
+		[field:SerializeField]
+		public float[] LocalTerrainMap { get; set; }
+		public float[] UnEditedLocalTerrainMap { get; set; }
+		
+		public Dictionary<int, float> EditedPoints { get; } = new();
+		public bool IsProcessing { get; set; }
+
+		public byte[] compressedEditedKeys;
+		public byte[] compressedEditedValues;
+		
+		public Action<Chunk, Vector3, float, bool> OnEdit;
+		public Action<Chunk> OnDispose;
+		
+		public Chunk(float terrainSurface, bool smoothTerrain, bool flatShaded, int terrainMapSize, int chunkSize)
 		{
+			this.chunkSize = chunkSize;
+			this.terrainMapSize = terrainMapSize;
 			this.terrainSurface = terrainSurface;
 			this.smoothTerrain = smoothTerrain;
 			this.flatShaded = flatShaded;
@@ -27,26 +59,7 @@ namespace MagicTerrain_V2
 			for (var i = 0; i < MeshDataSets.Length; i++) MeshDataSets[i] = new MeshData();
 		}
 
-		public MeshData[] MeshDataSets { get; set; }
-		public Mesh[] Meshes { get; set; }
-		public bool EditsHaveBeenApplied { get; set; }
-		public bool Hasdata => LocalTerrainMap != null;
-		public Dictionary<int, float> EditedPoints { get; set; } = new();
-		public int ChunkSize { get; set; }
-		public ChunkCore ChunkCore { get; set; }
-		public bool WasEdited { get; set; }
-		public bool ForceCompletion { get; private set; }
-
-		public float[] LocalTerrainMap { get; set; }
-		public float[] UnEditedLocalTerrainMap { get; set; }
-
-		public byte[] compressedEditedKeys;
-		public byte[] compressedEditedValues;
-
-		public Action<bool> OnMeshJobDone;
-		public Action OnDispose;
-
-		public void BuildMesh(int lodIndex)
+		private void BuildMesh(int lodIndex)
 		{
 			Meshes ??= new Mesh[5];
 			Meshes[lodIndex] ??= new Mesh();
@@ -54,6 +67,35 @@ namespace MagicTerrain_V2
 			Meshes[lodIndex].vertices = MeshDataSets[lodIndex].chunkVertices;
 			Meshes[lodIndex].triangles = MeshDataSets[lodIndex].chunkTriangles;
 			Meshes[lodIndex].RecalculateNormals();
+		}
+		
+		public bool IsVisible(Plane[] planes)
+		{
+			var nodeBounds = new Bounds(PositionReal, Vector3.one * (chunkSize * 2)); //if planets don't move this can be cached
+			// Check if the renderer is within the view frustum of the camera
+			var visible = GeometryUtility.TestPlanesAABB(planes, nodeBounds);
+			return visible;
+		}
+		
+		public void SetLodIndex(int index)
+		{
+			if (ChunkContainer != null)
+			{
+				ChunkContainer.LodIndex = index;
+			}
+		}
+		
+		public void Disable()
+		{
+			IsActive = false;
+			ChunkContainer.DisableContainer();
+		}
+		
+		public void EnableNode()
+		{
+			IsActive = true;
+			ChunkContainer.EnableContainer();
+			ChunkContainer.transform.position = PositionReal;
 		}
 
 		public void CompressChunkData()
@@ -72,7 +114,12 @@ namespace MagicTerrain_V2
 			}
 		}
 
-		public void ApplyChunkEdits()
+		internal void EditChunk(Vector3 hitPoint, float radius, bool add)
+		{
+			OnEdit?.Invoke(this, hitPoint, radius, add);
+		}
+
+		private void ApplyChunkEdits()
 		{
 			if (EditsHaveBeenApplied) return;
 			foreach (var editedPoint in EditedPoints)
@@ -94,6 +141,7 @@ namespace MagicTerrain_V2
 			if (ForceCompletion)
 			{
 				ForceCompletion = false;
+				IsProcessing = false;
 				return true;
 			}
 
@@ -118,20 +166,21 @@ namespace MagicTerrain_V2
 		public void CreateAndQueueEditTerrainMapJob(Vector3Int differenceInPosition,
 			NativeArray<EditedNodePointValue> editedNodePointValues, bool add)
 		{
+			IsProcessing = true;
 			var arrayLength = editedNodePointValues.Length;
 			var terrainMapEditJob = new EditTerrainMapJob
 			{
 				diferenceInPosition = differenceInPosition,
 				points = new NativeArray<EditedNodePointValue>(editedNodePointValues, Allocator.TempJob),
 				add = add,
-				chunkSize = ChunkSize + 1,
+				chunkSize = chunkSize + 1,
 				terrainMap = new NativeArray<float>(LocalTerrainMap, Allocator.TempJob),
 				wasEdited = new NativeArray<bool>(1, Allocator.TempJob)
 			};
 			jobHandler.StartJob(terrainMapEditJob.Schedule(arrayLength, 244), terrainMapEditJob);
 		}
 
-		public void CompleteEditTerrainMapJob(IChunkJob jobHandlerChunkJob)
+		private void CompleteEditTerrainMapJob(IChunkJob jobHandlerChunkJob)
 		{
 			var editTerrainMapJob = (EditTerrainMapJob)jobHandlerChunkJob;
 			var wasEdited = editTerrainMapJob.wasEdited[0];
@@ -162,12 +211,12 @@ namespace MagicTerrain_V2
 			float lacunarityCaves,
 			float gainCaves,
 			float domainWarpAmp,
-			int terrainMapSize,
 			int seed)
 		{
+			IsProcessing = true;
 			var terrainMapJob = new TerrainMapJob
 			{
-				chunkSize = ChunkSize + 1,
+				chunkSize = chunkSize + 1,
 				chunkPosition = chunkPosition,
 				planetSize = planetSize,
 				octaves = octaves,
@@ -182,7 +231,7 @@ namespace MagicTerrain_V2
 				terrainMap = new NativeArray<float>(terrainMapSize, Allocator.TempJob),
 				seed = seed
 			};
-			jobHandler.StartJob(terrainMapJob.Schedule(ChunkSize + 1, 244), terrainMapJob);
+			jobHandler.StartJob(terrainMapJob.Schedule(chunkSize + 1, 244), terrainMapJob);
 		}
 
 		public void CompleteTerrainMapJob(IChunkJob jobHandlerChunkJob)
@@ -192,7 +241,6 @@ namespace MagicTerrain_V2
 			UnEditedLocalTerrainMap = LocalTerrainMap.ToArray();
 			ApplyChunkEdits();
 			CreateAndQueueMeshDataJob(0);
-			OnMeshJobDone?.Invoke(true);
 			terrainMapJob.terrainMap.Dispose();
 		}
 
@@ -201,7 +249,7 @@ namespace MagicTerrain_V2
 		{
 			var meshDataJob = new MeshDataJob
 			{
-				chunkSize = ChunkSize + 1,
+				chunkSize = chunkSize + 1,
 				terrainMap = new NativeArray<float>(LocalTerrainMap, Allocator.TempJob),
 				terrainSurface = terrainSurface,
 				cube = new NativeArray<float>(8, Allocator.TempJob),
@@ -210,8 +258,8 @@ namespace MagicTerrain_V2
 				triCount = new NativeArray<int>(1, Allocator.TempJob),
 				vertCount = new NativeArray<int>(1, Allocator.TempJob),
 				//max number of triangles: 21845 and vertices: 65535
-				vertices = new NativeArray<Vector3>(65535, Allocator.TempJob),
-				triangles = new NativeArray<int>(21845, Allocator.TempJob),
+				vertices = new NativeArray<Vector3>(70000, Allocator.TempJob),
+				triangles = new NativeArray<int>(25000, Allocator.TempJob),
 				lodIndex = lodIndex
 			};
 			jobHandler.StartJob(meshDataJob.Schedule(), meshDataJob);
@@ -238,7 +286,6 @@ namespace MagicTerrain_V2
 
 			BuildMesh(lodIndex);
 
-
 			meshDataJob.triCount.Dispose();
 			meshDataJob.vertCount.Dispose();
 			meshDataJob.vertices.Dispose();
@@ -246,14 +293,12 @@ namespace MagicTerrain_V2
 
 			if (lodIndex >= 3)
 			{
-				OnMeshJobDone?.Invoke(true);
+				IsProcessing = false;
+				ChunkContainer?.CreateChunkMesh();
 				return true;
 			}
-			else
-			{
-				CreateAndQueueMeshDataJob(lodIndex + 1);
-				OnMeshJobDone?.Invoke(false);
-			}
+
+			CreateAndQueueMeshDataJob(lodIndex + 1);
 			return false;
 		}
 
@@ -276,14 +321,18 @@ namespace MagicTerrain_V2
 			}
 
 			jobHandler.Dispose();
-			jobHandler = null;
 			LocalTerrainMap = null;
 			UnEditedLocalTerrainMap = null;
 			compressedEditedKeys = null;
 			compressedEditedValues = null;
-			MeshDataSets = null;
-			OnMeshJobDone = null;
-			OnDispose?.Invoke();
+			
+			MeshDataSets = new MeshData[5];
+			for (var i = 0; i < MeshDataSets.Length; i++) MeshDataSets[i] = new MeshData();
+			
+			OnEdit = null;
+			if (ChunkContainer != null) ChunkContainer.OnEdit -= EditChunk;
+			ChunkContainer = null;
+			OnDispose?.Invoke(this);
 		}
 	}
 }
