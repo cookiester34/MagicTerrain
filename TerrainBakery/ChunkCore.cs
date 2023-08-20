@@ -117,6 +117,21 @@ namespace TerrainBakery
 				Gizmos.color = Color.red;
 				Gizmos.DrawSphere(editedNodePointValuePosition + editedNodePointValue.PointPosition, 0.1f);
 			});
+
+			if (loadSaveSystem != null)
+			{
+				foreach (var chunkSet in loadSaveSystem.ChunkSets)
+				{
+					Gizmos.color = Color.magenta;
+					Gizmos.DrawWireCube(chunkSet.Key, new Vector3(chunkSetSize * chunkSize, chunkSetSize * chunkSize, chunkSetSize * chunkSize));
+
+					foreach (var chunk in chunkSet.Value.chunks)
+					{
+						Gizmos.color = Color.blue;
+						Gizmos.DrawCube(chunk.Key, new Vector3(1, 1, 1));
+					}
+				}
+			}
 		}
 		
 		private void Awake()
@@ -124,7 +139,7 @@ namespace TerrainBakery
 			var chunkSizeDoubled = chunkSize * 2;
 			var terrainMapSize = chunkSizeDoubled * chunkSizeDoubled * chunkSize;
 			var chunkParameters = new object[] { TERRAIN_SURFACE, smoothTerrain, flatShaded, terrainMapSize, chunkSize };
-			loadSaveSystem = new ChunkSetSaveLoadSystem(planetName, chunkPoolCount, chunkSetSize * chunkSize, chunkParameters, coreMaterial);
+			loadSaveSystem = new ChunkSetSaveLoadSystem(this, planetName, chunkPoolCount, chunkSetSize * chunkSize, chunkParameters, coreMaterial);
 		}
 		
 		private void Start()
@@ -148,7 +163,7 @@ namespace TerrainBakery
 			if (fixedFrameCount % 60 == 0)
 			{
 				fixedFrameCount = 0;
-				loadSaveSystem.SaveOutOfRangeChunkSets();
+				loadSaveSystem.SaveOutOfRangeChunkSets(playerTransform.position);
 			}
 		}
 		

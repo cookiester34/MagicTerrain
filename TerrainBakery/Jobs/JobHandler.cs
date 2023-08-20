@@ -9,8 +9,6 @@ namespace TerrainBakery.Jobs
 		public int JobFrameCount { get; private set; }
 		public bool IsInProcess { get; set; }
 
-		private bool wasCompleted;
-
 		public void StartJob(JobHandle jobHandle, IChunkJob chunkJob)
 		{
 			JobHandle = jobHandle;
@@ -18,13 +16,10 @@ namespace TerrainBakery.Jobs
 			JobHandle.ScheduleBatchedJobs();
 			JobFrameCount = 0;
 			IsInProcess = true;
-			wasCompleted = false;
 		}
 
 		public bool CheckCompletion()
 		{
-			if (wasCompleted) return false;
-			
 			JobFrameCount++;
 			if (JobHandle.IsCompleted || JobFrameCount >= 3)
 			{
@@ -32,7 +27,6 @@ namespace TerrainBakery.Jobs
 				//if job has reached 4 frames complete it.
 				JobHandle.Complete();
 				IsInProcess = false;
-				wasCompleted = true;
 			}
 
 			return JobHandle.IsCompleted;
@@ -43,7 +37,6 @@ namespace TerrainBakery.Jobs
 			if (!IsInProcess) return;
 			JobHandle.Complete();
 			IsInProcess = false;
-			wasCompleted = true;
 			switch (ChunkJob)
 			{
 				case EditTerrainMapJob editTerrainMapJob:

@@ -11,14 +11,17 @@ public class ChunkSetSaveLoadSystem
 	private readonly int chunkSetSize;
 	private readonly string savePathDirectory;
 	
-	private Dictionary<Vector3Int, ChunkSet> ChunkSets { get; } = new();
+	internal Dictionary<Vector3Int, ChunkSet> ChunkSets { get; } = new();
 	private TerrainObjectPool<ChunkContainer> chunkContainerPool;
 	private TerrainPool<Chunk> chunkPool;
 	private Material coreMaterial;
+	private ChunkCore chunkCore;
 
-	public ChunkSetSaveLoadSystem(string planetName, int poolCount, int chunkSetSize, object[] chunkParameters,
+	public ChunkSetSaveLoadSystem(ChunkCore chunkCore, string planetName, int poolCount, int chunkSetSize,
+		object[] chunkParameters,
 		Material coreMaterial)
 	{
+		this.chunkCore = chunkCore;
 		this.chunkSetSize = chunkSetSize;
 		this.coreMaterial = coreMaterial;
 		
@@ -52,8 +55,8 @@ public class ChunkSetSaveLoadSystem
 
 	public void ReturnChunkToPool(Chunk chunk)
 	{
-		chunkContainerPool.ReturnPoolObject(chunk.ChunkContainer);
 		chunk.Dispose();
+		chunkContainerPool.ReturnPoolObject(chunk.ChunkContainer);
 		chunkPool.ReturnPoolObject(chunk);
 	}
 
@@ -76,21 +79,23 @@ public class ChunkSetSaveLoadSystem
 		throw new Exception($"No chunk was produced, a critical error, for chunk at position: {chunkPosition}");
 	}
 
-	public void SaveOutOfRangeChunkSets()
+	public void SaveOutOfRangeChunkSets(Vector3 playerPosition)
 	{
 		List<Vector3Int> keysToRemove = new();
+		var setSize = chunkSetSize;
 		foreach (var (key, chunkSet) in ChunkSets)
 		{
-			if (chunkSet.CanBeUnloaded())
-			{
-				var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
-				var file = File.Create(savePath);
-				using var writer = new BinaryWriter(file);
-				chunkSet.Serialize(writer);
-				writer.Flush();
-				file.Close();
-				keysToRemove.Add(key);
-			}
+			var distance = Vector3.Distance(playerPosition, key);
+			if (distance < setSize) continue;
+			if (!chunkSet.CanBeUnloaded()) continue;
+			
+			var savePath = Path.Combine(savePathDirectory, $"{chunkSet.ChunkSetPosition}.mtcs");
+			var file = File.Create(savePath);
+			using var writer = new BinaryWriter(file);
+			chunkSet.Serialize(writer);
+			writer.Flush();
+			file.Close();
+			keysToRemove.Add(key);
 		}
 
 		foreach (var key in keysToRemove)
@@ -124,7 +129,7 @@ public class ChunkSetSaveLoadSystem
 		}
 		
 		var savePath = Path.Combine(savePathDirectory, $"{chunkSetPosition}.mtcs");
-		foundChunkSet = new ChunkSet(chunkSetPosition, this);
+		foundChunkSet = new ChunkSet(chunkCore, chunkSetPosition, this);
 		
 		//Check if the file exists if not create a new one
 		if (!File.Exists(savePath))

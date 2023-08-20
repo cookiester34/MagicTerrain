@@ -14,17 +14,16 @@ namespace TerrainBakery.Saving
 		public Vector3Int ChunkSetPosition => chunkSetPosition;
 
 		private ChunkSetSaveLoadSystem saveLoadSystem;
-		private bool setIsInactive;
-		private bool readyToBeUnloaded;
-		private Dictionary<Vector3Int, Chunk> chunks { get; }
+		private ChunkCore chunkCore;
+		
+		internal Dictionary<Vector3Int, Chunk> chunks { get; }
 
-		public ChunkSet(Vector3Int chunkSetPosition, ChunkSetSaveLoadSystem saveLoadSystem)
+		public ChunkSet(ChunkCore chunkCore, Vector3Int chunkSetPosition, ChunkSetSaveLoadSystem saveLoadSystem)
 		{
+			this.chunkCore = chunkCore;
 			this.saveLoadSystem = saveLoadSystem;
 			chunks = new();
 			this.chunkSetPosition = chunkSetPosition;
-			readyToBeUnloaded = false;
-			setIsInactive = false;
 		}
 
 		public Chunk RequestChunk(Vector3Int chunkPosition)
@@ -38,18 +37,14 @@ namespace TerrainBakery.Saving
 
 		public bool CanBeUnloaded()
 		{
-			foreach (var chunk in chunks)
-			{
-				if (chunk.Value.IsActive) return false;
-			}
-
-			return true;
+			return chunks.All(chunk => !chunk.Value.IsActive && !chunk.Value.IsProcessing);
 		}
 
 		public void Dispose()
 		{
 			foreach (var (_, chunk) in chunks)
 			{
+				chunkCore.queuedChunks.Remove(chunk);
 				saveLoadSystem.ReturnChunkToPool(chunk);
 			}
 			chunks.Clear();

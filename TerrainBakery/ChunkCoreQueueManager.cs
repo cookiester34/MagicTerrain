@@ -8,8 +8,8 @@ namespace TerrainBakery
 {
 	public partial class ChunkCore
 	{
-		private HashSet<Chunk> queuedChunks = new();
-		private List<Chunk> chunksGenerating = new();
+		internal HashSet<Chunk> queuedChunks = new();
+		private HashSet<Chunk> chunksGenerating = new();
 		
 		private HashSet<Chunk> chunksEditing = new();
 		private readonly Dictionary<Chunk, ChunkEditJobData> queuedNodesCirclePoints = new();
@@ -42,7 +42,7 @@ namespace TerrainBakery
 				var orderedNodes = queuedChunks.OrderBy(node => Vector3.Distance(node.Position, playerTransformPosition)).ToArray();
 				foreach (var chunk in orderedNodes)
 				{
-					if (chunksGenerating.Count > 20) break;
+					if (chunksGenerating.Count > 25) break;
 					if (chunk != null)
 					{
 						chunksGenerating.Add(chunk);
@@ -62,6 +62,16 @@ namespace TerrainBakery
 					}
 					queuedChunks.Remove(chunk);
 				}
+			}
+		}
+		
+		private void CheckGenerateQueues()
+		{
+			var nodesToRemove = chunksGenerating.Where(chunk => chunk.CheckJobComplete()).ToList();
+
+			foreach (var node in nodesToRemove)
+			{
+				chunksGenerating.Remove(node);
 			}
 		}
 		
@@ -86,7 +96,7 @@ namespace TerrainBakery
 				{
 					circleNodeToRemove.Add(node);
 					chunkEditJobData.GetCirclePointsJob.points.Dispose();
-					Debug.LogError($"Neighbour Chunk at {node.Position} is already being processed");
+					Debug.LogWarning($"Neighbour Chunk at {node.Position} is already being processed");
 					continue;
 				}
 
@@ -126,35 +136,11 @@ namespace TerrainBakery
 		
 		private void CheckEditQueues()
 		{
-			List<Chunk> nodesToRemove = new();
-			foreach (var chunk in chunksEditing)
-			{
-				if (chunk.CheckJobComplete())
-				{
-					nodesToRemove.Add(chunk);
-				}
-			}
+			var nodesToRemove = chunksEditing.Where(chunk => chunk.CheckJobComplete()).ToList();
 
 			foreach (var node in nodesToRemove)
 			{
 				chunksEditing.Remove(node);
-			}
-		}
-
-		private void CheckGenerateQueues()
-		{
-			List<Chunk> nodesToRemove = new();
-			foreach (var chunk in chunksGenerating)
-			{
-				if (chunk.CheckJobComplete())
-				{
-					nodesToRemove.Add(chunk);
-				}
-			}
-
-			foreach (var node in nodesToRemove)
-			{
-				chunksGenerating.Remove(node);
 			}
 		}
 	}

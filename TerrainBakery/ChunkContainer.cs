@@ -55,10 +55,24 @@ namespace TerrainBakery
 
 		public void CreateChunkMesh()
 		{
-			if (chunk?.Meshes == null) return;
-			if (chunk.Meshes.Length == 0) return;
+			if (chunk?.Meshes == null)
+			{
+				Debug.LogWarning($"Chunk has no meshes");
+				return;
+			}
+			if (chunk.Meshes.Length == 0)
+			{
+				Debug.LogError($"Critical Error, Chunk has no meshes");
+				return;
+			}
+			
 			CheckContainerHasComponents();
 			var chunkMesh = chunk.Meshes[LodIndex];
+			if (chunkMesh == null)
+			{
+				Debug.LogWarning($"Chunk has no mesh, at lod index {lodIndex}");
+				return;
+			}
 			if (chunkMesh.vertexCount <= 0) return;
 			meshFilter.sharedMesh = chunkMesh;
 			meshCollider.sharedMesh = chunkMesh;

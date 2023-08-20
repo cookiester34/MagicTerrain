@@ -145,19 +145,21 @@ namespace TerrainBakery
 				return true;
 			}
 
-			if (jobHandler.CheckCompletion())
+			if (!jobHandler.CheckCompletion()) return false;
+			
+			switch (jobHandler.ChunkJob)
 			{
-				switch (jobHandler.ChunkJob)
-				{
-					case EditTerrainMapJob:
-						CompleteEditTerrainMapJob(jobHandler.ChunkJob);
-						break;
-					case TerrainMapJob:
-						CompleteTerrainMapJob(jobHandler.ChunkJob);
-						break;
-					case MeshDataJob:
-						return CompleteMeshDataJob(jobHandler.ChunkJob);
-				}
+				case EditTerrainMapJob:
+					CompleteEditTerrainMapJob(jobHandler.ChunkJob);
+					break;
+				case TerrainMapJob:
+					CompleteTerrainMapJob(jobHandler.ChunkJob);
+					break;
+				case MeshDataJob:
+					return CompleteMeshDataJob(jobHandler.ChunkJob);
+				case null:
+					//Just so the chunk will be removed from the queue if it somehow manages to reach here.
+					return true;
 			}
 
 			return false;
@@ -239,6 +241,11 @@ namespace TerrainBakery
 			var terrainMapJob = (TerrainMapJob)jobHandlerChunkJob;
 			LocalTerrainMap = terrainMapJob.terrainMap.ToArray();
 			UnEditedLocalTerrainMap = LocalTerrainMap.ToArray();
+
+			if (LocalTerrainMap.Length <= 0)
+			{
+				Debug.LogError($"Critical Error, terrain map is empty at chunk position {Position}");
+			}
 			ApplyChunkEdits();
 			CreateAndQueueMeshDataJob(0);
 			terrainMapJob.terrainMap.Dispose();
@@ -269,6 +276,7 @@ namespace TerrainBakery
 		public bool CompleteMeshDataJob(IChunkJob jobHandlerChunkJob)
 		{
 			var meshDataJob = (MeshDataJob)jobHandlerChunkJob;
+			
 			meshDataJob.cube.Dispose();
 			meshDataJob.terrainMap.Dispose();
 
@@ -290,12 +298,20 @@ namespace TerrainBakery
 			meshDataJob.vertCount.Dispose();
 			meshDataJob.vertices.Dispose();
 			meshDataJob.triangles.Dispose();
-
-			if (lodIndex >= 3)
+			
+			IsProcessing = false;
+			if (ChunkContainer != null)
 			{
-				IsProcessing = false;
-				ChunkContainer?.CreateChunkMesh();
-				return true;
+				if (lodIndex >= 3)
+				{
+					IsProcessing = false;
+					ChunkContainer.CreateChunkMesh();
+					return true;
+				}
+			}
+			else
+			{
+				Debug.LogError("Chunk has no ChunkContainer");
 			}
 
 			CreateAndQueueMeshDataJob(lodIndex + 1);
